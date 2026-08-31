@@ -19,7 +19,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "15247439897",
   appId: "1:15247439897:web:e6fc2c80248dfeee8f5288"
 };
-window.TEACHER_PIN = "1234";                                    // 교사 화면 접근 PIN (자유롭게 변경)
+window.TEACHER_PIN = "0802";                                    // 교사 화면 접근 PIN (자유롭게 변경)
 window.STUDENT_PAGE_URL = "https://imkmje.github.io/Korean_QUIZ/student.html"; // 배포된 student.html 주소
 </script>
 
@@ -148,17 +148,10 @@ input[type=number]{ font-size:16px; padding:8px 12px; border:2px solid var(--gri
 #player-count{ font-family:'Noto Serif KR', serif; font-weight:900; font-size:20px; margin-bottom:8px; }
 
 /* ---------- 실시간 답변 현황 (문제 화면) ---------- */
+/* 득표 수·응답자 닉네임은 아직 답변 중인 다른 학생에게 영향을 줄 수 있어
+   "답변 완료: N / M명" 인원수만 표시한다. */
 .answer-progress{ margin-top:18px; text-align:center; }
-.answer-progress .progress-label{ font-weight:900; color:var(--ink-soft); margin-bottom:8px; }
-.answer-progress .chip-row{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; max-width:800px; margin:0 auto; }
-.progress-chip{
-  border-radius:18px; padding:6px 14px 6px 8px; font-size:13px; font-weight:900; border:2px solid var(--grid);
-  background:#fff; color:var(--ink-soft); display:inline-flex; align-items:center; gap:6px;
-  animation:popIn .35s cubic-bezier(.34,1.56,.64,1) both; transition:border-color .2s ease, background .2s ease, color .2s ease;
-}
-.progress-chip .avatar{ font-size:15px; filter:grayscale(1); opacity:.6; }
-.progress-chip.done{ border-color:var(--green-deep); background:#E7F9EF; color:var(--green-deep); }
-.progress-chip.done .avatar{ filter:none; opacity:1; }
+.answer-progress .progress-label{ font-weight:900; color:var(--ink-soft); }
 
 /* ---------- 진행 바 ---------- */
 .progress-bar-outer{ width:100%; height:14px; background:var(--paper-dim); border:2px solid var(--ink); border-radius:8px; overflow:hidden; margin-top:10px; }
@@ -196,11 +189,6 @@ input[type=number]{ font-size:16px; padding:8px 12px; border:2px solid var(--gri
 .option-box.opt-blue{ background:var(--blue); }
 .option-box.opt-gold{ background:var(--gold); color:var(--ink); }
 .option-box.opt-green{ background:var(--green); }
-.option-box .count-bar{
-  position:absolute; left:0; bottom:0; height:8px; background:rgba(0,0,0,.28); border-radius:0 0 12px 12px;
-  transition:width .3s ease;
-}
-.option-box .count-num{ font-size:14px; font-weight:700; opacity:.85; margin-top:6px; }
 .option-box.correct{ animation:stampSlam .55s cubic-bezier(.34,1.56,.64,1) both; outline:5px solid var(--gold); outline-offset:3px; }
 .option-box.correct::after{ content:"✓ 정답"; position:absolute; top:-16px; right:10px; background:var(--gold); color:var(--ink); font-size:12px; font-weight:900; padding:4px 12px; border-radius:12px; border:2px solid var(--ink); }
 .option-box.dim{ opacity:.35; }
@@ -305,7 +293,7 @@ h2.explain{ font-family:'Noto Serif KR', serif; font-weight:700; font-size:20px;
     <div class="field">
       <label>문제 목록 (JSON)</label>
       <textarea id="questions-json"></textarea>
-      <div class="field-hint">type은 "ox" 또는 "mc". mc는 options 4개 필요. 아래 기본 20문항 예시가 채워져 있습니다 — 직접 수정해서 쓰세요.</div>
+      <div class="field-hint">type은 "ox" 또는 "mc". mc는 options 2개 이상(4개까지 색상 구분). 아래 기본 문항 예시가 채워져 있습니다 — 직접 수정해서 쓰세요.</div>
     </div>
 
     <div id="setup-error"></div>
@@ -386,26 +374,31 @@ let selectedAdvance = "manual";
 let unsubSession = null, unsubPlayers = null, unsubAnswers = null;
 
 const DEFAULT_QUESTIONS = [
-  {type:"ox", prompt:"오늘은 웬지 기분이 좋다.", answer:"X", explain:"'왠지'가 올바른 표기입니다."},
+  {type:"ox", prompt:"매사에 말과 행동을 삼가해야 한다.", answer:"X", explain:"삼가야 한다 — '삼가하다'는 없는 말입니다."},
   {type:"ox", prompt:"그는 회의 안건을 결제했다.", answer:"X", explain:"승인의 의미이므로 '결재'가 맞습니다."},
   {type:"ox", prompt:"감기가 다 낳았다.", answer:"X", explain:"병이 나은 것이므로 '나았다'가 맞습니다."},
-  {type:"ox", prompt:"그는 나와 다른 생각을 가지고 있다.", answer:"O", explain:"'다르다'의 올바른 활용입니다."},
   {type:"ox", prompt:"그는 친구로서 나를 도와줬다.", answer:"O", explain:"자격을 뜻하는 '로서'가 맞습니다."},
   {type:"ox", prompt:"실력으로서 승부를 봐야 한다.", answer:"X", explain:"수단을 뜻하므로 '실력으로써'가 맞습니다."},
-  {type:"ox", prompt:"너 커서 뭐가 돼고 싶니?", answer:"X", explain:"'되고'가 올바른 표기입니다."},
-  {type:"ox", prompt:"며칠 후에 다시 만나자.", answer:"O", explain:"'며칠'이 표준 표기입니다."},
-  {type:"ox", prompt:"오랜만이야, 잘 지냈어?", answer:"O", explain:"'오랜만'이 표준 표기입니다."},
+  {type:"ox", prompt:"고무줄을 늘여서 팔찌를 만들었다.", answer:"O", explain:"길이를 늘일 때는 '늘이다'가 맞습니다."},
   {type:"ox", prompt:"넉넉치 않은 형편이었다.", answer:"X", explain:"'넉넉지'가 올바른 표기입니다."},
-  {type:"mc", prompt:"다음 중 명사형으로 올바른 표기는?", options:["설레임","설렘","설레이다","설레움"], answer:"설렘", explain:"'설렘'이 표준어입니다."},
-  {type:"mc", prompt:"다음 중 올바른 표기는?", options:["왠일이니","웬일이니","왠지니","웬지니"], answer:"웬일이니", explain:"'웬일'이 표준 표기입니다."},
-  {type:"mc", prompt:"우표를 붙여 편지를 보내는 것은?", options:["편지를 붙이다","편지를 부치다","편지를 붇이다","편지를 부지다"], answer:"편지를 부치다", explain:"우편으로 보낼 때는 '부치다'."},
-  {type:"mc", prompt:"퀴즈에서 정답을 골라내는 것은?", options:["문제를 맞추다","문제를 맞히다","문제를 맞치다","문제를 맞후다"], answer:"문제를 맞히다", explain:"정답을 골라낼 때는 '맞히다'."},
-  {type:"mc", prompt:"'꼭'이라는 뜻으로 쓰이는 표기는?", options:["반듯이","반드시","반듣이","반드기"], answer:"반드시", explain:"'꼭'의 의미일 때는 '반드시'."},
-  {type:"mc", prompt:"다음 중 표준 표기는?", options:["하마트면","하마터면","하마트믄","하마더면"], answer:"하마터면", explain:"'하마터면'이 표준 표기입니다."},
-  {type:"mc", prompt:"김치를 만들 때 올바른 표기는?", options:["김치를 담궈 먹었다","김치를 담가 먹었다","김치를 담아 먹었다","김치를 담거 먹었다"], answer:"김치를 담가 먹었다", explain:"기본형 '담그다'의 활용은 '담가'."},
-  {type:"mc", prompt:"'조금 후에'라는 뜻으로 올바른 표기는?", options:["있다가","이따가","있따가","이따가서"], answer:"이따가", explain:"시간 부사는 '이따가'."},
-  {type:"mc", prompt:"날짜를 셀 때 올바른 표기는?", options:["몇일째","며칠째","몇 일째","몇칠째"], answer:"며칠째", explain:"'며칠'이 표준 표기입니다."},
-  {type:"mc", prompt:"방법을 묻는 올바른 표기는?", options:["어떡해야 할지","어떻게 해야 할지","어떠캐야 할지","어떡케야 할지"], answer:"어떻게 해야 할지", explain:"'어떻게 해야'가 맞습니다. '어떡해'는 그 자체로 완결된 감탄 표현입니다."}
+  {type:"ox", prompt:"내일 시간 되요?", answer:"X", explain:"'되어요?'가 자연스러우므로 '돼요?'가 맞습니다."},
+  {type:"ox", prompt:"이건 제 것이 아니예요.", answer:"X", explain:"'아니다'는 무조건 '아니에요'로 씁니다."},
+  {type:"ox", prompt:"저녁 먹고 설겆이를 했다.", answer:"X", explain:"'설거지'가 표준어입니다."},
+  {type:"ox", prompt:"친구야, 이따 전화할께.", answer:"X", explain:"'할게'가 표준 표기입니다."},
+  {type:"ox", prompt:"집안일은 웃어른을 잘 챙겨야 한다.", answer:"O", explain:"위아래 구분이 불명확한 말이라 '웃-'을 씁니다."},
+  {type:"ox", prompt:"오랫만에 만난 친구가 반가웠다.", answer:"X", explain:"'오랜만에'가 맞습니다."},
+  {type:"ox", prompt:"아침에 햇님이 방긋 웃었다.", answer:"X", explain:"'님'은 접사이므로 사이시옷 없이 '해님'으로 씁니다."},
+  {type:"mc", prompt:"다음 중 명사형으로 올바른 표기는?", options:["설레임","설렘"], answer:"설렘", explain:"'설렘'이 표준어입니다."},
+  {type:"mc", prompt:"다음 중 올바른 표기는?", options:["왠일이니","웬일이니"], answer:"웬일이니", explain:"'웬일'이 표준 표기입니다."},
+  {type:"mc", prompt:"우표를 붙여 편지를 보내는 것은?", options:["편지를 붙이다","편지를 부치다"], answer:"편지를 부치다", explain:"우편으로 보낼 때는 '부치다'."},
+  {type:"mc", prompt:"퀴즈에서 정답을 골라내는 것은?", options:["문제를 맞추다","문제를 맞히다"], answer:"문제를 맞히다", explain:"정답을 골라낼 때는 '맞히다'."},
+  {type:"mc", prompt:"'꼭'이라는 뜻으로 쓰이는 표기는?", options:["반듯이","반드시"], answer:"반드시", explain:"'꼭'의 의미일 때는 '반드시'."},
+  {type:"mc", prompt:"다음 중 표준 표기는?", options:["하마트면","하마터면"], answer:"하마터면", explain:"'하마터면'이 표준 표기입니다."},
+  {type:"mc", prompt:"'조금 후에'라는 뜻으로 올바른 표기는?", options:["있다가","이따가"], answer:"이따가", explain:"시간 부사는 '이따가'."},
+  {type:"mc", prompt:"날짜를 셀 때 올바른 표기는?", options:["몇일째","며칠째"], answer:"며칠째", explain:"'며칠'이 표준 표기입니다."},
+  {type:"mc", prompt:"문맥에 맞는 표기는? '결과가 어찌 ___ 최선을 다하자'", options:["되던","되든"], answer:"되든", explain:"선택지 중 무엇이든 상관없다는 뜻일 땐 '든'."},
+  {type:"mc", prompt:"문맥에 맞는 표기는? '어제 하늘이 얼마나 ___ 모른다'", options:["아름답든지","아름답던지"], answer:"아름답던지", explain:"과거를 회상하며 추정할 땐 '던지'."},
+  {type:"mc", prompt:"관용구로 올바른 것은?", options:["가능한 빨리 와줘","가능한 한 빨리 와줘"], answer:"가능한 한 빨리 와줘", explain:"'가능한'은 관형어라 뒤에 '한'을 붙여야 완전한 문장이 됩니다."}
 ];
 document.getElementById("questions-json").value = JSON.stringify(DEFAULT_QUESTIONS, null, 2);
 
@@ -596,22 +589,20 @@ function renderQuestion(){
 
   // 옵션 렌더링 (카훗 스타일 색상 + 도형 아이콘)
   const optWrap = document.getElementById("options-grid");
+  // 득표 수는 답변 중인 다른 학생에게 영향을 줄 수 있어 화면에 표시하지 않는다.
+  // (정답 공개 시에도 정답 강조만 하고 득표 집계는 보여주지 않음 — updateAnswerCounts 참고)
   if(q.type === "ox"){
     optWrap.className = "options-grid ox";
     const oxShape = { "O": {cls:"opt-green", icon:"●"}, "X": {cls:"opt-red", icon:"✕"} };
     optWrap.innerHTML = ["O","X"].map(v=>`
       <div class="option-box ${oxShape[v].cls}" data-val="${v}">
         <div><span class="opt-icon">${oxShape[v].icon}</span>${v}</div>
-        <div class="count-num" data-count="${v}">0표</div>
-        <div class="count-bar" data-bar="${v}" style="width:0%"></div>
       </div>`).join("");
   } else {
     optWrap.className = "options-grid";
     optWrap.innerHTML = q.options.map((v,i)=>`
       <div class="option-box ${OPT_SHAPES[i%4].cls}" data-val="${escapeHtml(v)}">
         <div><span class="opt-icon">${OPT_SHAPES[i%4].icon}</span>${escapeHtml(v)}</div>
-        <div class="count-num" data-count="${escapeHtml(v)}">0표</div>
-        <div class="count-bar" data-bar="${escapeHtml(v)}" style="width:0%"></div>
       </div>`).join("");
   }
 
@@ -644,39 +635,21 @@ function subscribeAnswers(){
     updateAnswerCounts();
   });
 }
+// 득표 집계는 화면에 표시하지 않는다 — 아직 답변 중인 다른 학생에게 영향을 줄 수 있기 때문.
+// 답변 여부 갱신(답변 완료 인원수)만 반영한다.
 function updateAnswerCounts(){
-  const q = questions[session.current_index];
-  const relevant = currentAnswers.filter(a=>a.question_index===session.current_index);
-  const total = relevant.length || 1;
-  const tally = {};
-  relevant.forEach(a=>{ tally[a.answer] = (tally[a.answer]||0)+1; });
-  const opts = q.type==="ox" ? ["O","X"] : q.options;
-  opts.forEach(v=>{
-    const c = tally[v]||0;
-    const pct = Math.round((c/total)*100);
-    const countEl = document.querySelector(`[data-count="${cssEscape(v)}"]`);
-    const barEl = document.querySelector(`[data-bar="${cssEscape(v)}"]`);
-    if(countEl) countEl.textContent = `${c}표`;
-    if(barEl) barEl.style.width = pct+"%";
-  });
   renderAnswerProgress();
 }
-function cssEscape(v){ return v.replace(/"/g,'\\"'); }
 
-// 카훗처럼: 전체 참여자 닉네임(아바타) + 실시간 답변 완료 현황
+// 카훗처럼: 답변 완료 인원수만 실시간 표시. 누가 답했는지(닉네임)는 다른 학생에게
+// 영향을 줄 수 있어 보여주지 않는다.
 function renderAnswerProgress(){
   const wrap = document.getElementById("answer-progress");
   if(session.mode !== "individual" || players.length===0){ wrap.innerHTML = ""; return; }
   const relevant = currentAnswers.filter(a=>a.question_index===session.current_index);
   const answeredIds = new Set(relevant.map(a=>a.player_id));
   const doneCount = players.filter(p=>answeredIds.has(p.id)).length;
-  wrap.innerHTML = `
-    <div class="progress-label">⚡ 답변 완료: ${doneCount} / ${players.length}명</div>
-    <div class="chip-row">${players.map(p=>`
-      <span class="progress-chip ${answeredIds.has(p.id)?'done':''}">
-        <span class="avatar">${avatarFor(p.nickname)}</span>${escapeHtml(p.nickname)}${answeredIds.has(p.id) ? ' ✓' : ''}
-      </span>`).join("")}</div>
-  `;
+  wrap.innerHTML = `<div class="progress-label">⚡ 답변 완료: ${doneCount} / ${players.length}명</div>`;
 }
 
 // 다음 문제로 넘어가기 전 현재 스코어보드
