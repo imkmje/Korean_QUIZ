@@ -318,6 +318,17 @@ async function rejoin(sessionId, playerId){
   questions = qSnap.exists() ? (qSnap.data().questions || []) : [];
   session = { id: sessSnap.id, ...sessSnap.data() };
   player = { id: playerSnap.id, ...playerSnap.data() };
+
+  // 새로고침 직후 answeredIndex가 -1로 리셋되어, 이미 제출한 문제도 다시 답변
+  // 화면이 뜨거나(재제출 시 firestore.rules상 update 금지라 "제출 실패" 오류)
+  // 정답 공개에서 실제로는 답했는데 "－"(미제출)로 잘못 표시되는 문제가 있었다.
+  // 이미 저장된 답변 문서가 있는지 확인해 answeredIndex를 복원한다.
+  try{
+    const answerId = `${player.id}_${session.current_index}`;
+    const ansSnap = await getDoc(doc(db, "quiz_sessions", sessionId, "answers", answerId));
+    if(ansSnap.exists()) answeredIndex = session.current_index;
+  }catch(e){}
+
   startListening();
   renderForStatus();
 }
