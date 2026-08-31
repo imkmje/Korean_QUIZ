@@ -372,7 +372,7 @@ const STUDENT_PAGE_URL = window.STUDENT_PAGE_URL;
 // ============================================================
 // 1. 상태
 // ============================================================
-let session = null;         // {id, room_code, status, mode, advance_mode, time_limit, current_index, questions}
+let session = null;         // {id, room_code, status, mode, advance_mode, time_limit, current_index} — questions는 별도 subscribe
 let questions = [];
 let players = [];
 let currentAnswers = [];    // 세션 전체 답변 (문항별 필터는 렌더 시점에 처리)
@@ -489,6 +489,10 @@ async function createSession(){
   const timeLimit = parseInt(document.getElementById("time-limit-input").value) || 20;
   const roomCode = genRoomCode();
 
+  // 문제 목록(questions)은 세션 중 안 바뀌는 큰 데이터라서 실시간으로 계속
+  // 갱신되는 세션 문서 본체에는 넣지 않는다. "다음 문제"처럼 상태만 바뀌는
+  // 업데이트마다 문제 텍스트 전체가 매번 학생 전원에게 다시 내려가는 걸
+  // 막아서 동기화 지연을 줄이기 위함 — meta/questions 하위 문서에 한 번만 저장.
   const sessionData = {
     room_code: roomCode,
     status: "lobby",
@@ -496,13 +500,13 @@ async function createSession(){
     advance_mode: selectedAdvance,
     time_limit: timeLimit,
     current_index: -1,
-    questions: questions,
     created_at: serverTimestamp()
   };
 
   let docRef;
   try{
     docRef = await addDoc(collection(db, "quiz_sessions"), sessionData);
+    await setDoc(doc(db, "quiz_sessions", docRef.id, "meta", "questions"), { questions });
   }catch(e){
     errEl.textContent = "세션 생성 실패: " + e.message;
     return;

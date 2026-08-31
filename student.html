@@ -176,7 +176,8 @@ import {
 const app = initializeApp(window.FIREBASE_CONFIG);
 const db = getFirestore(app);
 
-let session = null;   // {id, room_code, status, mode, advance_mode, time_limit, current_index, questions}
+let session = null;   // {id, room_code, status, mode, advance_mode, time_limit, current_index} — questions는 별도 로딩
+let questions = [];   // meta/questions 하위 문서에서 참여 시 한 번만 받아옴
 let player = null;    // {id, nickname, score}
 let answeredIndex = -1;
 let streak = 0;
@@ -258,6 +259,15 @@ async function joinSession(){
     return;
   }
 
+  // 문제 목록은 세션 문서 본체가 아니라 별도 하위 문서에 있으므로 참여 시 한 번만 받아온다.
+  try{
+    const qSnap = await getDoc(doc(db, "quiz_sessions", sessDoc.id, "meta", "questions"));
+    questions = qSnap.exists() ? (qSnap.data().questions || []) : [];
+  }catch(e){
+    errEl.textContent = "문제 목록을 불러오지 못했습니다: " + e.message;
+    return;
+  }
+
   let playerRef;
   try{
     playerRef = await addDoc(collection(db, "quiz_sessions", sessDoc.id, "players"), {
@@ -279,6 +289,8 @@ async function rejoin(sessionId, playerId){
   const sessSnap = await getDoc(doc(db, "quiz_sessions", sessionId));
   const playerSnap = await getDoc(doc(db, "quiz_sessions", sessionId, "players", playerId));
   if(!sessSnap.exists() || !playerSnap.exists()) return;
+  const qSnap = await getDoc(doc(db, "quiz_sessions", sessionId, "meta", "questions"));
+  questions = qSnap.exists() ? (qSnap.data().questions || []) : [];
   session = { id: sessSnap.id, ...sessSnap.data() };
   player = { id: playerSnap.id, ...playerSnap.data() };
   startListening();
@@ -321,7 +333,7 @@ const OPT_SHAPES = [
 ];
 
 function renderQuestion(){
-  const q = session.questions[session.current_index];
+  const q = questions[session.current_index];
   document.getElementById("q-prompt-student").textContent = q.prompt;
   document.getElementById("answer-status").textContent = "";
   const grid = document.getElementById("answer-grid");
@@ -386,7 +398,7 @@ async function submitAnswer(val){
     const label = b.textContent.replace(/^[▲◆●■✕]/,"").trim();
     if(label === val) b.classList.add("picked");
   });
-  const q = session.questions[session.current_index];
+  const q = questions[session.current_index];
   const isCorrect = (val === q.answer);
   const points = calcPoints(isCorrect);
 
@@ -422,7 +434,7 @@ function playStamp(kind, text){
 }
 
 async function renderReveal(){
-  const q = session.questions[session.current_index];
+  const q = questions[session.current_index];
   const streakWrap = document.getElementById("streak-badge-wrap");
   streakWrap.innerHTML = "";
   if(answeredIndex === session.current_index){

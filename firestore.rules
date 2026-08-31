@@ -20,6 +20,16 @@ service cloud.firestore {
       allow create, update: if true;
       allow delete: if false;
 
+      // 문제 목록(questions)은 세션 중 절대 바뀌지 않는 큰 데이터라서, 실시간으로
+      // 계속 갱신되는 세션 문서 본체에는 넣지 않고 이 하위 문서(meta/questions)에
+      // 한 번만 저장한다. 학생 화면은 참여할 때 이 문서를 한 번만 읽어오고,
+      // 세션 문서는 진행 상태(current_index, status 등)만 구독한다.
+      match /meta/{metaId} {
+        allow read: if true;
+        allow create, update: if true;
+        allow delete: if false;
+      }
+
       match /players/{playerId} {
         allow read: if true;
         allow create, update: if true;
@@ -42,7 +52,11 @@ service cloud.firestore {
 // quiz_sessions/{sessionId}
 //   room_code: string, status: string, mode: string,
 //   advance_mode: string, time_limit: number, current_index: number,
-//   questions: array, created_at: timestamp
+//   question_started_at: timestamp, created_at: timestamp
+//   (questions 배열은 아래 meta/questions 하위 문서로 분리되어 있음)
+//
+//   /meta/questions
+//     questions: array
 //
 //   /players/{playerId}
 //     nickname: string, score: number, joined_at: timestamp
