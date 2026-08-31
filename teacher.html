@@ -258,6 +258,18 @@ h2.explain{ font-family:'Noto Serif KR', serif; font-weight:700; font-size:20px;
   <button class="btn red" onclick="checkPin()">입장</button>
 </div>
 
+<!-- ============ 세션 재접속 화면 ============ -->
+<div id="resume-screen" class="screen">
+  <div class="mascot">🔄</div>
+  <h1>진행 중인 세션이 있어요</h1>
+  <p style="color:var(--ink-soft); margin-bottom:8px;">방 코드 <strong id="resume-room-code"></strong></p>
+  <p style="color:var(--ink-soft); margin-bottom:20px;">새로고침 전에 하던 세션을 이어서 볼까요?</p>
+  <div class="control-bar">
+    <button class="btn red" onclick="resumeSession()">이어서 보기</button>
+    <button class="btn ghost" onclick="startFresh()">새로 시작</button>
+  </div>
+</div>
+
 <!-- ============ 설정 화면 ============ -->
 <div id="setup-screen" class="screen">
   <div class="setup-card">
@@ -380,6 +392,23 @@ let timerInterval = null;
 let selectedMode = "individual";
 let selectedAdvance = "manual";
 let unsubSession = null, unsubPlayers = null, unsubAnswers = null;
+let localQuestionStartedAt = null; // advanceTo() 직후에만 신선한 로컬 시각 근사치 (아래 renderQuestion 타이머 참고)
+let pendingResumeId = null;
+
+// ============================================================
+// 세션 재접속 지원: 노트북이 잠들었다 깨거나 실수로 새로고침해도
+// 진행 중이던 세션(방 코드가 그대로인)으로 돌아올 수 있게 한다.
+// 이게 없으면 새로고침할 때마다 새 방 코드가 발급돼서 학생 전원이 다시 접속해야 했다.
+// ============================================================
+function saveSessionRef(id){
+  try{ localStorage.setItem("quiz_teacher_session", id); }catch(e){}
+}
+function clearSessionRef(){
+  try{ localStorage.removeItem("quiz_teacher_session"); }catch(e){}
+}
+function loadSessionRef(){
+  try{ return localStorage.getItem("quiz_teacher_session"); }catch(e){ return null; }
+}
 
 const DEFAULT_QUESTIONS = [
   {type:"ox", prompt:"매사에 말과 행동을 삼가해야 한다.", answer:"X", explain:"삼가야 한다 — '삼가하다'는 없는 말입니다."},
@@ -445,13 +474,100 @@ function fireConfetti(count){
 // ============================================================
 // 2. PIN 게이트
 // ============================================================
-function checkPin(){
+async function checkPin(){
   const val = document.getElementById("pin-input").value;
-  if(val === TEACHER_PIN){
-    showScreen("setup-screen");
-  } else {
+  if(val !== TEACHER_PIN){
     document.getElementById("pin-error").textContent = "PIN이 올바르지 않습니다.";
+    return;
   }
+  const savedId = loadSessionRef();
+  if(savedId){
+    const info = await peekSession(savedId);
+    if(info){
+      pendingResumeId = savedId;
+      document.getElementById("resume-room-code").textContent = info.room_code;
+      showScreen("resume-screen");
+      return;
+    }
+    clearSessionRef();
+  }
+  showScreen("setup-screen");
+}
+
+// 재접속 화면에 방 코드만 살짝 보여주기 위한 가벼운 조회 (아직 세션 상태 복원은 안 함)
+async function peekSession(sessionId){
+  try{
+    const snap = await getDoc(doc(db, "quiz_sessions", sessionId));
+    if(!snap.exists()) return null;
+    const data = snap.data();
+    if(data.status === "finished") return null;
+    return data;
+  }catch(e){
+    return null;
+  }
+}
+
+// "이어서 보기" 클릭 시 실제로 세션·문제 목록을 다시 불러와 현재 진행 상태에
+// 맞는 화면으로 복귀한다. 실패하면 false를 반환해서 호출부가 새로 시작하도록 한다.
+async function doResume(sessionId){
+  let snap;
+  try{
+    snap = await getDoc(doc(db, "quiz_sessions", sessionId));
+  }catch(e){
+    return false;
+  }
+  if(!snap.exists()) return false;
+  const data = snap.data();
+  if(data.status === "finished") return false;
+
+  let qSnap;
+  try{
+    qSnap = await getDoc(doc(db, "quiz_sessions", sessionId, "meta", "questions"));
+  }catch(e){
+    return false;
+  }
+  questions = qSnap.exists() ? (qSnap.data().questions || []) : [];
+  if(questions.length === 0) return false;
+
+  session = { id: snap.id, ...data };
+  localQuestionStartedAt = null; // 방금 getDoc으로 받은 session.question_started_at이 이미 정확한 서버 값
+  subscribeSession();
+  if(session.mode === "individual") subscribePlayers();
+
+  if(session.status === "lobby"){
+    if(session.mode === "individual"){
+      document.getElementById("room-code-display").textContent = session.room_code;
+      const joinUrl = `${STUDENT_PAGE_URL}?room=${session.room_code}`;
+      document.getElementById("join-url-display").textContent = joinUrl;
+      QRCode.toCanvas(document.getElementById("qr-canvas"), joinUrl, {width:260, margin:1});
+      showScreen("lobby-screen");
+    } else {
+      showScreen("display-lobby-screen");
+    }
+  } else if(session.status === "active" || session.status === "reveal"){
+    if(session.mode === "individual") subscribeAnswers();
+    renderQuestion();
+    if(session.status === "reveal") await applyReveal();
+    showScreen("question-screen");
+  } else {
+    return false;
+  }
+  return true;
+}
+
+async function resumeSession(){
+  const id = pendingResumeId;
+  pendingResumeId = null;
+  const ok = id ? await doResume(id) : false;
+  if(!ok){
+    clearSessionRef();
+    showScreen("setup-screen");
+  }
+}
+function startFresh(){
+  clearSessionRef();
+  pendingResumeId = null;
+  showScreen("setup-screen");
 }
 document.getElementById("pin-input").addEventListener("keydown", e=>{ if(e.key==="Enter") checkPin(); });
 
@@ -512,6 +628,7 @@ async function createSession(){
     return;
   }
   session = { id: docRef.id, ...sessionData };
+  saveSessionRef(docRef.id);
   subscribeSession();
 
   if(selectedMode === "individual"){
@@ -568,6 +685,10 @@ async function advanceTo(index){
     alert("진행 오류: "+e.message);
     return;
   }
+  // 방금 쓴 question_started_at은 서버에서 resolve되기 전이라 로컬 session 객체엔
+  // 아직 반영이 안 돼 있다(구독 콜백이 따라잡기 전 짧은 텀). 그 사이 타이머가
+  // 직전 문제의 오래된 시각을 기준으로 계산하지 않도록 지금 시각을 근사치로 남겨둔다.
+  localQuestionStartedAt = Date.now();
   session = { ...session, current_index:index, status:"active" };
   currentAnswers = [];
   renderQuestion();
@@ -622,23 +743,31 @@ function renderQuestion(){
       </div>`).join("");
   }
 
-  // 타이머 (auto 모드)
+  // 타이머 (auto 모드) — 학생 화면과 동일하게 question_started_at(서버 시각) 기준
+  // 경과 시간으로 계산한다. 세션을 재접속해서 들어온 경우에도(중간부터 이어붙는
+  // 경우) 처음부터 다시 20초를 주는 게 아니라 실제 남은 시간부터 정확히 이어진다.
   clearInterval(timerInterval);
   const badge = document.getElementById("timer-badge");
   badge.classList.remove("urgent");
   if(session.advance_mode === "auto"){
-    let remaining = session.time_limit;
     badge.style.display = "inline-block";
-    badge.textContent = remaining + "초";
-    timerInterval = setInterval(()=>{
-      remaining--;
-      badge.textContent = Math.max(remaining,0) + "초";
+    const limit = session.time_limit || 20;
+    const startedAtMs = localQuestionStartedAt
+      || (session.question_started_at && typeof session.question_started_at.toMillis === "function"
+        ? session.question_started_at.toMillis() : Date.now());
+    localQuestionStartedAt = null; // 이번 렌더에서만 쓰고 소모 — 다음 렌더는 항상 session 기준으로 다시 판단
+    const tick = () => {
+      const elapsed = (Date.now() - startedAtMs) / 1000;
+      const remaining = Math.max(0, Math.ceil(limit - elapsed));
+      badge.textContent = remaining + "초";
       badge.classList.toggle("urgent", remaining<=5 && remaining>0);
       if(remaining<=0){
         clearInterval(timerInterval);
         revealAnswer();
       }
-    },1000);
+    };
+    tick();
+    timerInterval = setInterval(tick, 1000);
   } else {
     badge.style.display = "none";
   }
@@ -684,22 +813,16 @@ function renderLiveLeaderboard(){
   el.style.display = "block";
 }
 
-async function revealAnswer(){
-  clearInterval(timerInterval);
-  const q = questions[session.current_index];
+// 정답 강조·해설 노출 등 "화면에 보여주는" 부분만 따로 뺐다. Firestore 기록이나
+// 컨페티 발사는 여기 포함하지 않아서, 재접속 시 이미 공개된 정답을 다시 그릴 때도
+// (새로 기록하거나 컨페티를 다시 터뜨리지 않고) 그대로 재사용할 수 있다.
+function renderRevealVisuals(q){
   document.querySelectorAll(".option-box").forEach(el=>{
     if(el.dataset.val === q.answer){ el.classList.add("correct"); }
     else { el.classList.add("dim"); }
   });
   document.getElementById("reveal-btn").disabled = true;
   document.getElementById("next-btn").disabled = false;
-
-  // 정답자 비율에 따라 컨페티 강도를 조절 (매번 크게 터뜨리면 25문항 내내 반복돼 피로해짐)
-  const relevant = currentAnswers.filter(a=>a.question_index===session.current_index);
-  const correctCount = relevant.filter(a=>a.is_correct).length;
-  const ratio = relevant.length ? correctCount / relevant.length : 0;
-  if(ratio >= 0.5) fireConfetti(60);
-  else if(correctCount > 0) fireConfetti(20);
 
   if(q.explain){
     const note = document.createElement("h2");
@@ -709,10 +832,36 @@ async function revealAnswer(){
     // 옵션 카드 바로 아래에 배치한다. 스코어보드는 그보다 덜 급한 부가 정보.
     document.getElementById("options-grid").insertAdjacentElement("afterend", note);
   }
+}
+
+async function revealAnswer(){
+  clearInterval(timerInterval);
+  const q = questions[session.current_index];
+  renderRevealVisuals(q);
+
+  // 정답자 비율에 따라 컨페티 강도를 조절 (매번 크게 터뜨리면 25문항 내내 반복돼 피로해짐)
+  const relevant = currentAnswers.filter(a=>a.question_index===session.current_index);
+  const correctCount = relevant.filter(a=>a.is_correct).length;
+  const ratio = relevant.length ? correctCount / relevant.length : 0;
+  if(ratio >= 0.5) fireConfetti(60);
+  else if(correctCount > 0) fireConfetti(20);
 
   await updateDoc(doc(db, "quiz_sessions", session.id), { status:"reveal" });
   session = { ...session, status:"reveal" };
 
+  if(session.mode === "individual"){
+    const q2 = query(collection(db, "quiz_sessions", session.id, "players"), orderBy("score","desc"));
+    const snap = await getDocs(q2);
+    players = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+    renderLiveLeaderboard();
+  }
+}
+
+// 재접속 시 이미 "정답 공개" 상태인 문제로 돌아왔을 때, Firestore에 다시 쓰거나
+// 컨페티를 다시 터뜨리지 않고 화면만 그 상태에 맞게 복원한다.
+async function applyReveal(){
+  const q = questions[session.current_index];
+  renderRevealVisuals(q);
   if(session.mode === "individual"){
     const q2 = query(collection(db, "quiz_sessions", session.id, "players"), orderBy("score","desc"));
     const snap = await getDocs(q2);
@@ -751,6 +900,7 @@ function renderPodium(top3){
 async function endGame(){
   await updateDoc(doc(db, "quiz_sessions", session.id), { status:"finished" });
   session = { ...session, status:"finished" };
+  clearSessionRef(); // 끝난 세션은 재접속 대상이 아니므로 저장해둔 참조를 지운다
   if(session.mode === "individual"){
     const q2 = query(collection(db, "quiz_sessions", session.id, "players"), orderBy("score","desc"));
     const snap = await getDocs(q2);
@@ -770,6 +920,12 @@ async function endGame(){
     document.getElementById("final-leaderboard").innerHTML = "<p style='text-align:center;color:var(--ink-soft);'>다같이 풀이 모드는 점수를 집계하지 않습니다.</p>";
   }
   showScreen("final-screen");
+
+  // 게임이 끝나면 더 이상 실시간으로 바뀔 데이터가 없으므로 구독을 정리한다.
+  clearInterval(timerInterval);
+  if(unsubAnswers){ unsubAnswers(); unsubAnswers = null; }
+  if(unsubPlayers){ unsubPlayers(); unsubPlayers = null; }
+  if(unsubSession){ unsubSession(); unsubSession = null; }
 }
 
 function escapeHtml(s){
@@ -778,6 +934,8 @@ function escapeHtml(s){
 
 // 인라인 onclick 핸들러가 참조할 수 있도록 전역에 노출
 window.checkPin = checkPin;
+window.resumeSession = resumeSession;
+window.startFresh = startFresh;
 window.selectMode = selectMode;
 window.selectAdvance = selectAdvance;
 window.createSession = createSession;

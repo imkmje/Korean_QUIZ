@@ -216,6 +216,17 @@ document.getElementById("join-form").addEventListener("submit", e=>{
   joinSession();
 });
 
+// 답변 버튼은 onclick="...('${텍스트}')" 형태로 만들지 않고 이벤트 위임으로 처리한다.
+// 보기 텍스트를 JS 코드 문자열 안에 직접 끼워 넣으면, 작은따옴표(')가 포함된
+// 보기가 나올 경우 escapeHtml을 거쳐도 브라우저가 속성값을 디코딩하면서
+// 다시 실제 따옴표로 돌아와 onclick의 JS 문법이 깨져(버튼이 눌러도 반응 없음)
+// 버리기 때문이다. data-value 속성 + 클릭 시점에 읽기로 이 문제를 원천 차단한다.
+document.getElementById("answer-grid").addEventListener("click", e=>{
+  const btn = e.target.closest(".answer-btn");
+  if(!btn || btn.disabled) return;
+  submitAnswer(btn.dataset.value);
+});
+
 // URL의 ?room= 값 자동 채우기
 try{
   const params = new URLSearchParams(location.search);
@@ -256,6 +267,20 @@ async function joinSession(){
   const sessData = sessDoc.data();
   if(sessData.status === "finished"){
     errEl.textContent = "이미 종료된 퀴즈입니다.";
+    return;
+  }
+
+  // 같은 방에 이미 같은 닉네임이 있으면 막는다 (공백·대소문자 무시 비교).
+  // 리더보드에서 이름이 겹쳐 보이는 걸 원천적으로 방지한다.
+  try{
+    const playersSnap = await getDocs(collection(db, "quiz_sessions", sessDoc.id, "players"));
+    const taken = playersSnap.docs.some(d => String(d.data().nickname || "").trim().toLowerCase() === nickname.toLowerCase());
+    if(taken){
+      errEl.textContent = "이미 사용 중인 닉네임입니다. 다른 닉네임을 써주세요.";
+      return;
+    }
+  }catch(e){
+    errEl.textContent = "닉네임 확인에 실패했습니다: " + e.message;
     return;
   }
 
@@ -340,10 +365,10 @@ function renderQuestion(){
   if(q.type === "ox"){
     grid.className = "answer-grid ox";
     const oxShape = { "O": {cls:"opt-green", icon:"●"}, "X": {cls:"opt-red", icon:"✕"} };
-    grid.innerHTML = ["O","X"].map(v=>`<button class="answer-btn ${oxShape[v].cls}" onclick="submitAnswer('${v}')"><span class="opt-icon">${oxShape[v].icon}</span>${v}</button>`).join("");
+    grid.innerHTML = ["O","X"].map(v=>`<button class="answer-btn ${oxShape[v].cls}" data-value="${v}"><span class="opt-icon">${oxShape[v].icon}</span>${v}</button>`).join("");
   } else {
     grid.className = "answer-grid";
-    grid.innerHTML = q.options.map((v,i)=>`<button class="answer-btn ${OPT_SHAPES[i%4].cls}" onclick="submitAnswer('${escapeHtml(v)}')"><span class="opt-icon">${OPT_SHAPES[i%4].icon}</span>${escapeHtml(v)}</button>`).join("");
+    grid.innerHTML = q.options.map((v,i)=>`<button class="answer-btn ${OPT_SHAPES[i%4].cls}" data-value="${escapeHtml(v)}"><span class="opt-icon">${OPT_SHAPES[i%4].icon}</span>${escapeHtml(v)}</button>`).join("");
   }
   const timerEl = document.getElementById("timer-mini");
   clearInterval(studentTimerInterval);
@@ -392,11 +417,9 @@ function calcPoints(isCorrect){
 
 async function submitAnswer(val){
   clearInterval(studentTimerInterval);
-  // 버튼 텍스트는 도형 아이콘(▲◆●■✕)이 앞에 붙어있으므로 떼고 비교한다.
   document.querySelectorAll(".answer-btn").forEach(b=>{
     b.disabled = true;
-    const label = b.textContent.replace(/^[▲◆●■✕]/,"").trim();
-    if(label === val) b.classList.add("picked");
+    if(b.dataset.value === val) b.classList.add("picked");
   });
   const q = questions[session.current_index];
   const isCorrect = (val === q.answer);
@@ -490,13 +513,15 @@ async function renderFinal(){
   else { medalEl.textContent = "🏁"; }
 
   try{ sessionStorage.removeItem("quiz_player"); }catch(e){}
+
+  // 게임이 끝나면 더 이상 실시간으로 바뀔 데이터가 없으므로 구독을 정리한다.
+  clearInterval(studentTimerInterval);
+  if(unsubSession){ unsubSession(); unsubSession = null; }
 }
 
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
-
-window.submitAnswer = submitAnswer;
 </script>
 </body>
 </html>
