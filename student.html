@@ -21,64 +21,112 @@ window.FIREBASE_CONFIG = {
 </script>
 
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700;900&family=Noto+Sans+KR:wght@400;500;700;900&display=swap');
 :root{
-  --paper:#FAF7F0; --grid:#DCD3BC; --ink:#262220; --ink-soft:#5B5348;
-  --red:#C43B2C; --navy:#2E3A4F; --green-stamp:#5C7A50;
+  --paper:#FFFDF6; --paper-dim:#F5EEDA; --grid:#E8DEC0; --ink:#262220; --ink-soft:#5B5348;
+  --red:#FF4B4B; --red-deep:#D62F2F; --navy:#2E3A4F;
+  --green:#28C76F; --green-deep:#1B9E56; --gold:#FFC93C; --gold-deep:#EFA500;
+  --blue:#3B82F6; --purple:#8B5CF6; --shadow-c:#262220;
 }
 *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
 body{
   background:var(--paper); color:var(--ink); font-family:'Noto Sans KR',sans-serif;
   min-height:100vh; overscroll-behavior:none;
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 30px 30px;
+  overflow-x:hidden;
 }
 .screen{ display:none; min-height:100vh; flex-direction:column; align-items:center; justify-content:center; padding:24px; text-align:center;}
 .screen.active{ display:flex; }
-h1{ font-family:'Noto Serif KR',serif; font-size:24px; margin-bottom:16px; }
+h1{ font-family:'Noto Serif KR',serif; font-weight:900; font-size:26px; margin-bottom:16px; }
+
+@keyframes popIn{ 0%{transform:scale(0.2) rotate(-10deg); opacity:0;} 65%{transform:scale(1.12) rotate(3deg); opacity:1;} 100%{transform:scale(1) rotate(0);} }
+@keyframes floaty{ 0%,100%{transform:translateY(0);} 50%{transform:translateY(-8px);} }
+@keyframes bounceDot{ 0%,80%,100%{transform:scale(0.6); opacity:.5;} 40%{transform:scale(1); opacity:1;} }
+@keyframes stampSlam{ 0%{transform:scale(3) rotate(-18deg); opacity:0;} 55%{transform:scale(0.9) rotate(-6deg); opacity:1;} 100%{transform:scale(1) rotate(-6deg);} }
+@keyframes shakeUrgent{ 10%,90%{transform:translateX(-2px);} 20%,80%{transform:translateX(3px);} 30%,50%,70%{transform:translateX(-6px);} 40%,60%{transform:translateX(6px);} }
+@keyframes confettiFall{ 0%{transform:translateY(-24px) rotate(0deg); opacity:1;} 100%{transform:translateY(104vh) rotate(600deg); opacity:0;} }
+@keyframes riseIn{ 0%{transform:translateY(30px); opacity:0;} 100%{transform:translateY(0); opacity:1;} }
+@keyframes pop{ 0%{transform:scale(1);} 40%{transform:scale(1.35);} 100%{transform:scale(1);} }
+
+.confetti-piece{ position:fixed; top:-20px; z-index:9999; pointer-events:none; animation-name:confettiFall; animation-timing-function:cubic-bezier(.3,.6,.6,1); border-radius:2px; }
+
 input{
-  font-size:20px; padding:14px 16px; border:2px solid var(--ink); border-radius:8px;
+  font-size:20px; padding:14px 16px; border:3px solid var(--ink); border-radius:10px;
   width:100%; max-width:320px; margin-bottom:14px; background:#fff;
+  box-shadow:3px 3px 0 var(--shadow-c);
 }
 .btn{
-  font-weight:700; font-size:18px; padding:16px 36px; border-radius:10px; border:none;
+  font-weight:900; font-size:18px; padding:16px 36px; border-radius:12px; border:3px solid var(--shadow-c);
   background:var(--navy); color:#fff; cursor:pointer; width:100%; max-width:320px;
+  box-shadow:4px 4px 0 var(--shadow-c); transition:transform .1s ease, box-shadow .1s ease;
 }
-.btn:active{ transform:scale(0.97); }
+.btn:active{ transform:translate(3px,3px); box-shadow:1px 1px 0 var(--shadow-c); }
 .btn:disabled{ opacity:.4; }
-#join-error, #answer-status{ color:var(--red); font-weight:700; min-height:20px; margin-top:4px;}
+#join-error, #answer-status{ color:var(--red-deep); font-weight:900; min-height:20px; margin-top:4px;}
+.mascot{ font-size:56px; margin-bottom:6px; animation:floaty 2.6s ease-in-out infinite; }
 
 .q-prompt{
-  font-family:'Noto Serif KR',serif; font-size:22px; line-height:1.6; margin-bottom:28px;
-  border:2px solid var(--ink); border-radius:10px; padding:20px; background:#fff; max-width:480px;
+  font-family:'Noto Serif KR',serif; font-size:22px; line-height:1.6; margin-bottom:24px;
+  border:3px solid var(--ink); border-radius:14px; padding:20px; background:#fff; max-width:480px;
+  box-shadow:4px 4px 0 var(--shadow-c);
 }
-.timer-mini{ font-weight:900; color:var(--red); font-size:18px; margin-bottom:14px; }
-.answer-grid{ display:grid; gap:14px; width:100%; max-width:360px; }
+.timer-mini{ font-weight:900; color:#fff; background:var(--red); font-size:16px; margin-bottom:14px; padding:6px 16px; border-radius:16px; border:2px solid var(--ink); }
+.timer-mini.urgent{ background:var(--red-deep); animation:shakeUrgent .5s ease-in-out infinite; }
+.answer-grid{ display:grid; gap:14px; width:100%; max-width:380px; }
 .answer-grid.ox{ grid-template-columns:1fr 1fr; }
 .answer-btn{
-  border:3px solid var(--ink); border-radius:14px; padding:26px 10px; font-size:22px; font-weight:700;
-  background:#fff; cursor:pointer;
+  border:3px solid var(--ink); border-radius:16px; padding:28px 10px; font-size:22px; font-weight:900;
+  color:#fff; cursor:pointer; box-shadow:4px 4px 0 var(--shadow-c); transition:transform .1s ease, box-shadow .1s ease;
 }
-.answer-btn.picked{ background:var(--navy); color:#fff; border-color:var(--navy); }
-.answer-btn:disabled{ opacity:.55; }
+.answer-btn .opt-icon{ display:block; font-size:20px; margin-bottom:4px; opacity:.9; }
+.answer-btn.opt-red{ background:var(--red); }
+.answer-btn.opt-blue{ background:var(--blue); }
+.answer-btn.opt-gold{ background:var(--gold); color:var(--ink); }
+.answer-btn.opt-green{ background:var(--green); }
+.answer-btn:active:not(:disabled){ transform:translate(3px,3px); box-shadow:1px 1px 0 var(--shadow-c); }
+.answer-btn.picked{ outline:5px solid var(--ink); outline-offset:2px; }
+.answer-btn:disabled{ opacity:.5; }
+
+.waiting-dots{ display:flex; gap:10px; margin-top:18px; }
+.waiting-dots span{ width:14px; height:14px; border-radius:50%; background:var(--navy); animation:bounceDot 1.2s ease-in-out infinite; }
+.waiting-dots span:nth-child(2){ animation-delay:.15s; background:var(--red); }
+.waiting-dots span:nth-child(3){ animation-delay:.3s; background:var(--gold-deep); }
 
 .result-stamp{
-  width:130px; height:130px; border-radius:50%; display:flex; align-items:center; justify-content:center;
-  font-family:'Noto Serif KR',serif; font-size:60px; font-weight:900; margin-bottom:16px; border:8px solid;
-  transform:rotate(-6deg);
+  width:140px; height:140px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-family:'Noto Serif KR',serif; font-size:64px; font-weight:900; margin-bottom:16px; border:8px solid;
+  transform:rotate(-6deg); background:#fff; animation:stampSlam .5s cubic-bezier(.34,1.56,.64,1) both;
 }
-.result-stamp.correct{ color:var(--green-stamp); border-color:var(--green-stamp); }
-.result-stamp.wrong{ color:var(--red); border-color:var(--red); }
-.result-answer{ color:var(--ink-soft); margin-bottom:6px; }
-.score-line{ font-family:'Noto Serif KR',serif; font-size:20px; margin-top:10px; }
+.result-stamp.correct{ color:var(--green-deep); border-color:var(--green-deep); }
+.result-stamp.wrong{ color:var(--red-deep); border-color:var(--red-deep); }
+.result-answer{ color:var(--ink-soft); margin-bottom:10px; max-width:340px; }
+.streak-badge{
+  display:inline-flex; align-items:center; gap:6px; background:var(--gold); color:var(--ink); font-weight:900;
+  padding:8px 18px; border-radius:20px; border:3px solid var(--ink); margin-bottom:14px; box-shadow:3px 3px 0 var(--shadow-c);
+  animation:popIn .4s cubic-bezier(.34,1.56,.64,1) both;
+}
+.score-line{ font-family:'Noto Serif KR',serif; font-weight:900; font-size:20px; margin-top:6px; }
+.score-line .num{ display:inline-block; animation:pop .35s ease; color:var(--red-deep); }
 .rank-line{ color:var(--ink-soft); margin-top:6px; }
+
+.final-medal{ font-size:70px; margin-bottom:10px; animation:floaty 2.4s ease-in-out infinite; }
+.final-card{
+  background:#fff; border:3px solid var(--ink); border-radius:16px; padding:26px 32px; box-shadow:6px 6px 0 var(--gold-deep);
+  animation:riseIn .4s ease both;
+}
 </style>
 
 <!-- ============ 참여 화면 ============ -->
 <div id="join-screen" class="screen active">
+  <div class="mascot">🎯</div>
   <h1>맞춤법 퀴즈</h1>
   <form id="join-form">
     <input id="room-input" type="text" inputmode="text" placeholder="방 코드 6자리" maxlength="6" autocomplete="off" autocapitalize="characters" enterkeyhint="next" style="text-transform:uppercase;">
     <input id="nickname-input" type="text" placeholder="닉네임" maxlength="10" autocomplete="off" enterkeyhint="go">
-    <button class="btn" type="submit">참여하기</button>
+    <button class="btn" type="submit">참여하기 🚀</button>
   </form>
   <div id="join-error"></div>
 </div>
@@ -87,6 +135,7 @@ input{
 <div id="waiting-screen" class="screen">
   <h1 id="waiting-title">선생님이 시작하기를 기다리는 중...</h1>
   <p style="color:var(--ink-soft);">화면을 앞에 있는 교실 화면과 함께 봐주세요.</p>
+  <div class="waiting-dots"><span></span><span></span><span></span></div>
 </div>
 
 <!-- ============ 문제 화면 ============ -->
@@ -99,6 +148,7 @@ input{
 
 <!-- ============ 정답 공개 화면 ============ -->
 <div id="reveal-screen" class="screen">
+  <div id="streak-badge-wrap"></div>
   <div class="result-stamp" id="result-stamp"></div>
   <div class="result-answer" id="result-answer-text"></div>
   <div class="score-line" id="score-line"></div>
@@ -106,9 +156,12 @@ input{
 
 <!-- ============ 종료 화면 ============ -->
 <div id="student-final-screen" class="screen">
+  <div class="final-medal" id="final-medal">🏁</div>
   <h1>퀴즈가 끝났습니다</h1>
-  <div class="score-line" id="final-score-line"></div>
-  <div class="rank-line" id="final-rank-line"></div>
+  <div class="final-card">
+    <div class="score-line" id="final-score-line"></div>
+    <div class="rank-line" id="final-rank-line"></div>
+  </div>
 </div>
 
 <script type="module">
@@ -124,11 +177,33 @@ const db = getFirestore(app);
 let session = null;   // {id, room_code, status, mode, advance_mode, time_limit, current_index, questions}
 let player = null;    // {id, nickname, score}
 let answeredIndex = -1;
+let streak = 0;
 let unsubSession = null;
 
 function showScreen(id){
   document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
   document.getElementById(id).classList.add("active");
+}
+
+// ============================================================
+// 게이미피케이션 유틸: 컨페티
+// ============================================================
+function fireConfetti(count){
+  count = count || 70;
+  const colors = ['#FF4B4B','#3B82F6','#FFC93C','#28C76F','#8B5CF6'];
+  for(let i=0;i<count;i++){
+    const el = document.createElement('div');
+    el.className = 'confetti-piece';
+    const size = 6 + Math.random()*7;
+    el.style.left = (Math.random()*100) + 'vw';
+    el.style.width = size + 'px';
+    el.style.height = size + 'px';
+    el.style.background = colors[Math.floor(Math.random()*colors.length)];
+    el.style.animationDuration = (2 + Math.random()*1.6) + 's';
+    el.style.animationDelay = (Math.random()*0.35) + 's';
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(), 4200);
+  }
 }
 
 // 폼 제출(모바일 키보드의 "이동/완료" 포함)로 참여하기 연결
@@ -235,6 +310,13 @@ function renderForStatus(){
   }
 }
 
+const OPT_SHAPES = [
+  {cls:"opt-red", icon:"▲"},
+  {cls:"opt-blue", icon:"◆"},
+  {cls:"opt-gold", icon:"●"},
+  {cls:"opt-green", icon:"■"}
+];
+
 function renderQuestion(){
   const q = session.questions[session.current_index];
   document.getElementById("q-prompt-student").textContent = q.prompt;
@@ -242,15 +324,17 @@ function renderQuestion(){
   const grid = document.getElementById("answer-grid");
   if(q.type === "ox"){
     grid.className = "answer-grid ox";
-    grid.innerHTML = ["O","X"].map(v=>`<button class="answer-btn" onclick="submitAnswer('${v}')">${v}</button>`).join("");
+    const oxShape = { "O": {cls:"opt-green", icon:"●"}, "X": {cls:"opt-red", icon:"✕"} };
+    grid.innerHTML = ["O","X"].map(v=>`<button class="answer-btn ${oxShape[v].cls}" onclick="submitAnswer('${v}')"><span class="opt-icon">${oxShape[v].icon}</span>${v}</button>`).join("");
   } else {
     grid.className = "answer-grid";
-    grid.innerHTML = q.options.map(v=>`<button class="answer-btn" onclick="submitAnswer('${escapeHtml(v)}')">${escapeHtml(v)}</button>`).join("");
+    grid.innerHTML = q.options.map((v,i)=>`<button class="answer-btn ${OPT_SHAPES[i%4].cls}" onclick="submitAnswer('${escapeHtml(v)}')"><span class="opt-icon">${OPT_SHAPES[i%4].icon}</span>${escapeHtml(v)}</button>`).join("");
   }
   const timerEl = document.getElementById("timer-mini");
   if(session.advance_mode === "auto"){
-    timerEl.style.display = "block";
-    timerEl.textContent = "제한 시간 " + session.time_limit + "초";
+    timerEl.style.display = "inline-block";
+    timerEl.className = "timer-mini";
+    timerEl.textContent = "⏱ 제한 시간 " + session.time_limit + "초";
   } else {
     timerEl.style.display = "none";
   }
@@ -273,7 +357,12 @@ function calcPoints(isCorrect){
 }
 
 async function submitAnswer(val){
-  document.querySelectorAll(".answer-btn").forEach(b=>{ b.disabled = true; if(b.textContent===val) b.classList.add("picked"); });
+  // 버튼 텍스트는 도형 아이콘(▲◆●■✕)이 앞에 붙어있으므로 떼고 비교한다.
+  document.querySelectorAll(".answer-btn").forEach(b=>{
+    b.disabled = true;
+    const label = b.textContent.replace(/^[▲◆●■✕]/,"").trim();
+    if(label === val) b.classList.add("picked");
+  });
   const q = session.questions[session.current_index];
   const isCorrect = (val === q.answer);
   const points = calcPoints(isCorrect);
@@ -300,14 +389,20 @@ async function submitAnswer(val){
 async function renderReveal(){
   const q = session.questions[session.current_index];
   const stamp = document.getElementById("result-stamp");
+  const streakWrap = document.getElementById("streak-badge-wrap");
+  streakWrap.innerHTML = "";
   if(answeredIndex === session.current_index){
     await checkMyAnswer();
   } else {
+    streak = 0;
     stamp.textContent = "－";
     stamp.className = "result-stamp wrong";
     document.getElementById("score-line").textContent = "";
   }
   document.getElementById("result-answer-text").textContent = `정답: ${q.answer}` + (q.explain ? ` (${q.explain})` : "");
+  if(streak >= 2){
+    streakWrap.innerHTML = `<div class="streak-badge">🔥 ${streak}연속 정답!</div>`;
+  }
 }
 
 async function checkMyAnswer(){
@@ -319,14 +414,17 @@ async function checkMyAnswer(){
     stamp.textContent = "O";
     stamp.className = "result-stamp correct";
     earned = snap.data().points_earned || 0;
+    streak++;
+    fireConfetti(35);
   } else {
     stamp.textContent = "X";
     stamp.className = "result-stamp wrong";
+    streak = 0;
   }
   const meSnap = await getDoc(doc(db, "quiz_sessions", session.id, "players", player.id));
   const myScore = meSnap.exists() ? (meSnap.data().score || 0) : 0;
-  document.getElementById("score-line").textContent = earned > 0
-    ? `이번 문제 +${earned}점 (빠른 정답 보너스) · 현재 점수: ${myScore}점`
+  document.getElementById("score-line").innerHTML = earned > 0
+    ? `이번 문제 <span class="num">+${earned}점</span> (빠른 정답 보너스) · 현재 점수: ${myScore}점`
     : `현재 점수: ${myScore}점`;
 }
 
@@ -340,6 +438,12 @@ async function renderFinal(){
   const all = allSnap.docs.map(d=>({ id:d.id, ...d.data() }));
   const rank = all.findIndex(p=>p.id===player.id) + 1;
   document.getElementById("final-rank-line").textContent = `전체 ${all.length}명 중 ${rank}등`;
+
+  const medalEl = document.getElementById("final-medal");
+  if(rank === 1){ medalEl.textContent = "🥇"; fireConfetti(140); }
+  else if(rank === 2){ medalEl.textContent = "🥈"; fireConfetti(90); }
+  else if(rank === 3){ medalEl.textContent = "🥉"; fireConfetti(90); }
+  else { medalEl.textContent = "🏁"; }
 
   try{ sessionStorage.removeItem("quiz_player"); }catch(e){}
 }

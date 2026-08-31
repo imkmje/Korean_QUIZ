@@ -24,19 +24,26 @@ window.STUDENT_PAGE_URL = "https://imkmje.github.io/Korean_QUIZ/student.html"; /
 </script>
 
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700;900&family=Noto+Sans+KR:wght@400;500;700;900&display=swap');
 
 :root{
-  --paper:#FAF7F0;
-  --paper-dim:#F1EBDD;
-  --grid:#DCD3BC;
+  --paper:#FFFDF6;
+  --paper-dim:#F5EEDA;
+  --grid:#E8DEC0;
   --ink:#262220;
   --ink-soft:#5B5348;
-  --red:#C43B2C;
-  --red-deep:#9E2E22;
+  --red:#FF4B4B;
+  --red-deep:#D62F2F;
   --navy:#2E3A4F;
   --navy-soft:#4A5A73;
-  --green-stamp:#5C7A50;
+  --green:#28C76F;
+  --green-deep:#1B9E56;
+  --gold:#FFC93C;
+  --gold-deep:#EFA500;
+  --blue:#3B82F6;
+  --blue-deep:#2563EB;
+  --purple:#8B5CF6;
+  --shadow-c:#262220;
 }
 *{box-sizing:border-box; margin:0; padding:0;}
 body{
@@ -49,39 +56,58 @@ body{
     linear-gradient(90deg, var(--grid) 1px, transparent 1px);
   background-size: 34px 34px;
   background-position: -1px -1px;
+  overflow-x:hidden;
 }
-.screen{ display:none; min-height:100vh; flex-direction:column; align-items:center; justify-content:center; padding:40px 24px;}
+.screen{ display:none; min-height:100vh; flex-direction:column; align-items:center; justify-content:center; padding:40px 24px; position:relative;}
 .screen.active{ display:flex; }
 
+/* ---------- 공용 애니메이션 ---------- */
+@keyframes popIn{ 0%{transform:scale(0.2) rotate(-10deg); opacity:0;} 65%{transform:scale(1.12) rotate(3deg); opacity:1;} 100%{transform:scale(1) rotate(0);} }
+@keyframes bounceIn{ 0%{transform:scale(0.4); opacity:0;} 55%{transform:scale(1.08); opacity:1;} 100%{transform:scale(1);} }
+@keyframes floaty{ 0%,100%{transform:translateY(0);} 50%{transform:translateY(-7px);} }
+@keyframes pulseGlow{ 0%,100%{ box-shadow:0 0 0 0 rgba(255,201,60,.55);} 50%{ box-shadow:0 0 0 14px rgba(255,201,60,0);} }
+@keyframes shakeUrgent{ 10%,90%{transform:translateX(-2px);} 20%,80%{transform:translateX(3px);} 30%,50%,70%{transform:translateX(-6px);} 40%,60%{transform:translateX(6px);} }
+@keyframes stampSlam{ 0%{transform:scale(2.6) rotate(-18deg); opacity:0;} 55%{transform:scale(0.92) rotate(-4deg); opacity:1;} 100%{transform:scale(1) rotate(-4deg);} }
+@keyframes confettiFall{ 0%{transform:translateY(-24px) rotate(0deg); opacity:1;} 100%{transform:translateY(104vh) rotate(600deg); opacity:0;} }
+@keyframes riseIn{ 0%{transform:translateY(40px); opacity:0;} 100%{transform:translateY(0); opacity:1;} }
+@keyframes shimmer{ 0%{background-position:-200px 0;} 100%{background-position:200px 0;} }
+
+.confetti-piece{ position:fixed; top:-20px; z-index:9999; pointer-events:none; animation-name:confettiFall; animation-timing-function:cubic-bezier(.3,.6,.6,1); border-radius:2px; }
+
+/* ---------- 공용 버튼 ---------- */
+.btn{
+  font-family:'Noto Sans KR', sans-serif; font-weight:900; font-size:18px;
+  padding:15px 34px; border-radius:12px; border:3px solid var(--shadow-c); cursor:pointer;
+  background:var(--navy); color:#fff; margin-top:20px;
+  box-shadow:4px 4px 0 var(--shadow-c);
+  transition: transform .1s ease, box-shadow .1s ease;
+}
+.btn:active{ transform: translate(3px,3px); box-shadow:1px 1px 0 var(--shadow-c); }
+.btn.red{ background:var(--red); }
+.btn.gold{ background:var(--gold); color:var(--ink); }
+.btn.ghost{ background:var(--paper); color:var(--navy); }
+.btn:disabled{ opacity:.4; cursor:not-allowed; box-shadow:4px 4px 0 var(--shadow-c); transform:none; }
+
 /* ---------- PIN 화면 ---------- */
+#pin-screen h1{ font-family:'Noto Serif KR', serif; font-weight:900; font-size:30px; margin-bottom:24px;}
+#pin-screen .mascot{ font-size:52px; margin-bottom:6px; animation:floaty 2.6s ease-in-out infinite; }
 #pin-screen input{
   font-size:32px; letter-spacing:12px; text-align:center; width:220px;
-  padding:14px 10px; border:3px solid var(--ink); border-radius:6px; background:var(--paper);
-  font-family:'Noto Serif KR', serif;
+  padding:14px 10px; border:3px solid var(--ink); border-radius:10px; background:var(--paper);
+  font-family:'Noto Serif KR', serif; box-shadow:4px 4px 0 var(--shadow-c);
 }
-#pin-screen h1{ font-family:'Noto Serif KR', serif; font-size:28px; margin-bottom:24px;}
-.btn{
-  font-family:'Noto Sans KR', sans-serif; font-weight:700; font-size:18px;
-  padding:14px 32px; border-radius:8px; border:none; cursor:pointer;
-  background:var(--navy); color:var(--paper); margin-top:20px;
-  transition: transform .08s ease;
-}
-.btn:active{ transform: scale(0.97); }
-.btn.red{ background:var(--red); }
-.btn.ghost{ background:transparent; color:var(--navy); border:2px solid var(--navy); }
-.btn:disabled{ opacity:.4; cursor:not-allowed; }
-#pin-error{ color:var(--red); margin-top:10px; font-weight:700; min-height:20px;}
+#pin-error{ color:var(--red-deep); margin-top:12px; font-weight:900; min-height:20px;}
 
 /* ---------- 설정 화면 ---------- */
 #setup-screen{ align-items:stretch; max-width:840px; margin:0 auto; }
 .setup-card{
-  background:var(--paper); border:2px solid var(--ink); border-radius:12px;
-  padding:32px; box-shadow:6px 6px 0 var(--grid);
+  background:var(--paper); border:3px solid var(--ink); border-radius:16px;
+  padding:32px; box-shadow:8px 8px 0 var(--gold);
 }
-.setup-card h1{ font-family:'Noto Serif KR', serif; font-size:30px; margin-bottom:6px;}
+.setup-card h1{ font-family:'Noto Serif KR', serif; font-weight:900; font-size:30px; margin-bottom:6px;}
 .setup-card p.sub{ color:var(--ink-soft); margin-bottom:24px;}
 .field{ margin-bottom:20px; }
-.field label{ display:block; font-weight:700; margin-bottom:8px; }
+.field label{ display:block; font-weight:900; margin-bottom:8px; }
 .field-hint{ color:var(--ink-soft); font-size:13px; margin-top:6px; }
 textarea#questions-json{
   width:100%; min-height:220px; font-family:monospace; font-size:13px;
@@ -89,49 +115,67 @@ textarea#questions-json{
 }
 .toggle-row{ display:flex; gap:10px; flex-wrap:wrap; }
 .toggle-option{
-  flex:1; min-width:180px; border:2px solid var(--grid); border-radius:10px; padding:14px;
-  cursor:pointer; background:#fff;
+  flex:1; min-width:180px; border:3px solid var(--grid); border-radius:12px; padding:14px;
+  cursor:pointer; background:#fff; transition:transform .12s ease, border-color .12s ease;
 }
-.toggle-option.selected{ border-color:var(--red); background:#FBEDE9; }
+.toggle-option:hover{ transform:translateY(-2px); }
+.toggle-option.selected{ border-color:var(--red); background:#FFF0EE; box-shadow:3px 3px 0 var(--red); }
 .toggle-option strong{ display:block; margin-bottom:4px; }
 .toggle-option span{ font-size:13px; color:var(--ink-soft); }
 input[type=number]{ font-size:16px; padding:8px 12px; border:2px solid var(--grid); border-radius:6px; width:100px;}
-#setup-error{ color:var(--red); font-weight:700; min-height:20px; margin-top:10px;}
+#setup-error{ color:var(--red-deep); font-weight:900; min-height:20px; margin-top:10px;}
 
 /* ---------- 로비 화면 ---------- */
 #lobby-screen{ text-align:center; }
 .room-code-box{
-  background:var(--navy); color:var(--paper); font-family:'Noto Serif KR', serif;
-  font-size:56px; font-weight:700; letter-spacing:10px; padding:18px 40px;
-  border-radius:12px; margin:20px 0;
+  background:var(--navy); color:#fff; font-family:'Noto Serif KR', serif;
+  font-size:56px; font-weight:900; letter-spacing:10px; padding:18px 40px;
+  border-radius:16px; margin:20px 0; border:3px solid var(--ink);
+  box-shadow:6px 6px 0 var(--gold);
+  animation:pulseGlow 2.4s ease-in-out infinite;
 }
-#qr-canvas{ background:#fff; padding:16px; border-radius:12px; border:2px solid var(--ink); margin:10px 0;}
+#qr-canvas{ background:#fff; padding:16px; border-radius:16px; border:3px solid var(--ink); margin:10px 0; box-shadow:5px 5px 0 var(--shadow-c);}
 .join-url{ color:var(--ink-soft); font-size:14px; margin-bottom:20px; word-break:break-all; }
 #player-list{
   display:flex; flex-wrap:wrap; gap:10px; justify-content:center; max-width:800px; margin:24px 0;
 }
 .player-chip{
-  background:#fff; border:2px solid var(--ink); border-radius:20px; padding:8px 18px; font-weight:700;
+  background:#fff; border:3px solid var(--ink); border-radius:24px; padding:8px 18px 8px 10px; font-weight:900;
+  display:inline-flex; align-items:center; gap:8px; box-shadow:3px 3px 0 var(--shadow-c);
+  animation:popIn .4s cubic-bezier(.34,1.56,.64,1) both;
 }
-#player-count{ font-family:'Noto Serif KR', serif; font-size:20px; margin-bottom:8px; }
+.player-chip .avatar{ font-size:20px; }
+#player-count{ font-family:'Noto Serif KR', serif; font-weight:900; font-size:20px; margin-bottom:8px; }
 
 /* ---------- 실시간 답변 현황 (문제 화면) ---------- */
 .answer-progress{ margin-top:18px; text-align:center; }
-.answer-progress .progress-label{ font-weight:700; color:var(--ink-soft); margin-bottom:8px; }
+.answer-progress .progress-label{ font-weight:900; color:var(--ink-soft); margin-bottom:8px; }
 .answer-progress .chip-row{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; max-width:800px; margin:0 auto; }
-.progress-chip{ border-radius:16px; padding:6px 14px; font-size:13px; font-weight:700; border:2px solid var(--grid); background:#fff; color:var(--ink-soft); }
-.progress-chip.done{ border-color:var(--green-stamp); background:#EEF3EC; color:var(--green-stamp); }
+.progress-chip{
+  border-radius:18px; padding:6px 14px 6px 8px; font-size:13px; font-weight:900; border:2px solid var(--grid);
+  background:#fff; color:var(--ink-soft); display:inline-flex; align-items:center; gap:6px;
+  animation:popIn .35s cubic-bezier(.34,1.56,.64,1) both; transition:border-color .2s ease, background .2s ease, color .2s ease;
+}
+.progress-chip .avatar{ font-size:15px; filter:grayscale(1); opacity:.6; }
+.progress-chip.done{ border-color:var(--green-deep); background:#E7F9EF; color:var(--green-deep); }
+.progress-chip.done .avatar{ filter:none; opacity:1; }
+
+/* ---------- 진행 바 ---------- */
+.progress-bar-outer{ width:100%; height:14px; background:var(--paper-dim); border:2px solid var(--ink); border-radius:8px; overflow:hidden; margin-top:10px; }
+.progress-bar-inner{ height:100%; background:linear-gradient(90deg, var(--gold), var(--red)); border-radius:6px; transition:width .4s ease; }
 
 /* ---------- 문제 화면 (원고지) ---------- */
 #question-screen{ width:100%; max-width:1000px; }
-.q-topbar{ display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:20px; }
-.q-progress{ font-weight:700; color:var(--ink-soft); }
+.q-topbar{ display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:8px; gap:16px; }
+.q-progress{ font-weight:900; color:var(--ink-soft); white-space:nowrap; }
 .timer-badge{
   background:var(--red); color:#fff; font-weight:900; font-size:20px;
-  padding:6px 18px; border-radius:20px; display:none;
+  padding:6px 18px; border-radius:20px; display:none; border:3px solid var(--ink);
+  box-shadow:3px 3px 0 var(--shadow-c);
 }
+.timer-badge.urgent{ background:var(--red-deep); animation:shakeUrgent .5s ease-in-out infinite; }
 .manuscript{
-  display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin:20px 0 34px;
+  display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin:26px 0 34px;
 }
 .manuscript span{
   width:52px; height:52px; border:2px solid var(--ink); border-radius:4px;
@@ -141,45 +185,81 @@ input[type=number]{ font-size:16px; padding:8px 12px; border:2px solid var(--gri
 .manuscript span.punct{ border-color:transparent; width:20px; }
 
 .options-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; width:100%; }
-.options-grid.ox{ grid-template-columns:1fr 1fr; max-width:500px; margin:0 auto; }
+.options-grid.ox{ grid-template-columns:1fr 1fr; max-width:520px; margin:0 auto; }
 .option-box{
-  border:3px solid var(--ink); border-radius:12px; padding:22px; text-align:center;
-  font-size:22px; font-weight:700; background:#fff; position:relative;
+  border:3px solid var(--ink); border-radius:16px; padding:24px 20px; text-align:center;
+  font-size:22px; font-weight:900; background:#fff; position:relative; color:#fff;
+  box-shadow:5px 5px 0 var(--shadow-c); transition:transform .15s ease;
 }
+.option-box .opt-icon{ font-size:15px; margin-right:8px; opacity:.85; vertical-align:2px; }
+.option-box.opt-red{ background:var(--red); }
+.option-box.opt-blue{ background:var(--blue); }
+.option-box.opt-gold{ background:var(--gold); color:var(--ink); }
+.option-box.opt-green{ background:var(--green); }
 .option-box .count-bar{
-  position:absolute; left:0; bottom:0; height:6px; background:var(--navy-soft); border-radius:0 0 8px 8px;
+  position:absolute; left:0; bottom:0; height:8px; background:rgba(0,0,0,.28); border-radius:0 0 12px 12px;
   transition:width .3s ease;
 }
-.option-box .count-num{ font-size:14px; color:var(--ink-soft); font-weight:400; margin-top:4px; }
-.option-box.correct{ border-color:var(--green-stamp); background:#EEF3EC; }
-.option-box.correct::after{ content:"✓ 정답"; position:absolute; top:-14px; right:10px; background:var(--green-stamp); color:#fff; font-size:12px; padding:3px 10px; border-radius:10px; }
+.option-box .count-num{ font-size:14px; font-weight:700; opacity:.85; margin-top:6px; }
+.option-box.correct{ animation:stampSlam .55s cubic-bezier(.34,1.56,.64,1) both; outline:5px solid var(--gold); outline-offset:3px; }
+.option-box.correct::after{ content:"✓ 정답"; position:absolute; top:-16px; right:10px; background:var(--gold); color:var(--ink); font-size:12px; font-weight:900; padding:4px 12px; border-radius:12px; border:2px solid var(--ink); }
+.option-box.dim{ opacity:.35; }
 
-.control-bar{ display:flex; gap:14px; margin-top:30px; }
+.control-bar{ display:flex; gap:14px; margin-top:26px; }
 
-/* ---------- 정답 공개 / 리더보드 ---------- */
+/* ---------- 리더보드 / 스코어보드 ---------- */
 .leaderboard{ width:100%; max-width:600px; margin:0 auto; }
-.leaderboard h3{ font-family:'Noto Serif KR', serif; font-size:18px; margin-bottom:10px; text-align:center; }
+.leaderboard h3{ font-family:'Noto Serif KR', serif; font-weight:900; font-size:20px; margin-bottom:12px; text-align:center; }
 .lb-row{
   display:flex; justify-content:space-between; align-items:center; background:#fff;
-  border:2px solid var(--ink); border-radius:10px; padding:14px 20px; margin-bottom:10px; font-weight:700;
+  border:3px solid var(--ink); border-radius:12px; padding:12px 18px; margin-bottom:10px; font-weight:900;
+  box-shadow:4px 4px 0 var(--shadow-c); position:relative; overflow:hidden;
+  animation:riseIn .35s ease both;
 }
-.lb-row .rank{ color:var(--red); margin-right:14px; font-family:'Noto Serif KR', serif; font-size:22px; }
+.lb-row .lb-left{ display:flex; align-items:center; gap:10px; z-index:1; }
+.lb-row .rank{ color:var(--red-deep); font-family:'Noto Serif KR', serif; font-size:22px; min-width:28px; }
+.lb-row.rank-1 .rank{ color:var(--gold-deep); font-size:26px; }
+.lb-row.rank-2 .rank{ color:#8A94A6; }
+.lb-row.rank-3 .rank{ color:#B5651D; }
+.lb-row .lb-avatar{ font-size:20px; }
+.lb-row .lb-score{ z-index:1; }
+.lb-row .lb-bar{ position:absolute; left:0; top:0; bottom:0; background:var(--paper-dim); z-index:0; transition:width .5s ease; }
+.lb-row.rank-1{ border-color:var(--gold-deep); box-shadow:4px 4px 0 var(--gold-deep); }
 
-h2.explain{ font-family:'Noto Serif KR', serif; font-weight:500; font-size:20px; color:var(--ink-soft); margin-top:16px; text-align:center; }
+/* ---------- 시상대(포디움) ---------- */
+.podium{ display:flex; align-items:flex-end; justify-content:center; gap:14px; margin:20px 0 32px; width:100%; }
+.podium-slot{ display:flex; flex-direction:column; align-items:center; }
+.podium-slot .p-avatar{ font-size:38px; margin-bottom:6px; animation:floaty 2.4s ease-in-out infinite; }
+.podium-slot .p-name{ font-weight:900; margin-bottom:6px; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.podium-slot .p-score{ font-weight:900; color:var(--ink-soft); margin-bottom:8px; }
+.podium-slot .p-bar{
+  width:110px; border:3px solid var(--ink); border-radius:10px 10px 0 0; display:flex; align-items:flex-start;
+  justify-content:center; padding-top:10px; font-family:'Noto Serif KR',serif; font-weight:900; font-size:26px; color:#fff;
+}
+.podium-slot.first .p-bar{ height:150px; background:var(--gold-deep); box-shadow:5px 0 0 var(--shadow-c); }
+.podium-slot.second .p-bar{ height:112px; background:#9AA5B4; }
+.podium-slot.third .p-bar{ height:88px; background:#C08245; }
+.podium-slot.first{ order:2; }
+.podium-slot.second{ order:1; }
+.podium-slot.third{ order:3; }
+
+h2.explain{ font-family:'Noto Serif KR', serif; font-weight:700; font-size:20px; color:var(--ink-soft); margin-top:20px; text-align:center; background:var(--paper-dim); border-radius:12px; padding:14px 18px; border:2px dashed var(--grid);}
 
 @media (max-width:640px){
   .manuscript span{ width:38px; height:38px; font-size:19px; }
   .room-code-box{ font-size:36px; padding:14px 24px; letter-spacing:6px;}
   .options-grid{ grid-template-columns:1fr; }
+  .podium-slot .p-bar{ width:80px; }
 }
 </style>
 
 <!-- ============ PIN 화면 ============ -->
 <div id="pin-screen" class="screen active">
+  <div class="mascot">✏️</div>
   <h1>맞춤법 퀴즈 · 교사 화면</h1>
   <input id="pin-input" type="password" inputmode="numeric" maxlength="6" placeholder="····">
   <div id="pin-error"></div>
-  <button class="btn" onclick="checkPin()">입장</button>
+  <button class="btn red" onclick="checkPin()">입장</button>
 </div>
 
 <!-- ============ 설정 화면 ============ -->
@@ -235,7 +315,7 @@ h2.explain{ font-family:'Noto Serif KR', serif; font-weight:500; font-size:20px;
 
 <!-- ============ 로비 화면 ============ -->
 <div id="lobby-screen" class="screen">
-  <h1 style="font-family:'Noto Serif KR',serif;">학생들을 기다리는 중</h1>
+  <h1 style="font-family:'Noto Serif KR',serif;">🎉 학생들을 기다리는 중</h1>
   <div class="room-code-box" id="room-code-display"></div>
   <canvas id="qr-canvas"></canvas>
   <div class="join-url" id="join-url-display"></div>
@@ -259,19 +339,21 @@ h2.explain{ font-family:'Noto Serif KR', serif; font-weight:500; font-size:20px;
     <div class="q-progress" id="q-progress"></div>
     <div class="timer-badge" id="timer-badge"></div>
   </div>
+  <div class="progress-bar-outer"><div class="progress-bar-inner" id="progress-bar-inner" style="width:0%"></div></div>
   <div class="manuscript" id="manuscript-prompt"></div>
   <div class="options-grid" id="options-grid"></div>
   <div class="answer-progress" id="answer-progress"></div>
   <div class="control-bar">
     <button class="btn ghost" id="reveal-btn" onclick="revealAnswer()">정답 공개</button>
-    <button class="btn" id="next-btn" onclick="nextQuestion()" disabled>다음 문제</button>
+    <button class="btn gold" id="next-btn" onclick="nextQuestion()" disabled>다음 문제 →</button>
   </div>
   <div class="leaderboard" id="live-leaderboard" style="display:none;"></div>
 </div>
 
 <!-- ============ 종료 화면 ============ -->
 <div id="final-screen" class="screen">
-  <h1 style="font-family:'Noto Serif KR',serif; margin-bottom:24px;">최종 결과</h1>
+  <h1 style="font-family:'Noto Serif KR',serif; font-weight:900; margin-bottom:16px;">🏆 최종 결과</h1>
+  <div class="podium" id="final-podium"></div>
   <div class="leaderboard" id="final-leaderboard"></div>
   <button class="btn" onclick="location.reload()" style="margin-top:24px;">새 세션 시작</button>
 </div>
@@ -330,6 +412,33 @@ document.getElementById("questions-json").value = JSON.stringify(DEFAULT_QUESTIO
 function showScreen(id){
   document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
   document.getElementById(id).classList.add("active");
+}
+
+// ============================================================
+// 게이미피케이션 유틸: 아바타 이모지 / 컨페티
+// ============================================================
+const AVATARS = ['🐯','🦊','🐰','🐼','🦁','🐨','🐸','🐵','🐷','🐙','🦄','🐳','🦉','🐝','🐢','🦋','🐱','🐶','🦖','🐔'];
+function avatarFor(nickname){
+  let h = 0;
+  for(const c of String(nickname)) h = (h*31 + c.charCodeAt(0)) >>> 0;
+  return AVATARS[h % AVATARS.length];
+}
+function fireConfetti(count){
+  count = count || 70;
+  const colors = ['#FF4B4B','#3B82F6','#FFC93C','#28C76F','#8B5CF6'];
+  for(let i=0;i<count;i++){
+    const el = document.createElement('div');
+    el.className = 'confetti-piece';
+    const size = 6 + Math.random()*7;
+    el.style.left = (Math.random()*100) + 'vw';
+    el.style.width = size + 'px';
+    el.style.height = size + 'px';
+    el.style.background = colors[Math.floor(Math.random()*colors.length)];
+    el.style.animationDuration = (2 + Math.random()*1.6) + 's';
+    el.style.animationDelay = (Math.random()*0.35) + 's';
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(), 4200);
+  }
 }
 
 // ============================================================
@@ -424,7 +533,9 @@ function subscribePlayers(){
 }
 function renderPlayerList(){
   document.getElementById("player-count").textContent = `참여 인원: ${players.length}명`;
-  document.getElementById("player-list").innerHTML = players.map(p=>`<div class="player-chip">${escapeHtml(p.nickname)}</div>`).join("");
+  document.getElementById("player-list").innerHTML = players.map(p=>`
+    <div class="player-chip"><span class="avatar">${avatarFor(p.nickname)}</span>${escapeHtml(p.nickname)}</div>
+  `).join("");
 }
 
 // ============================================================
@@ -458,9 +569,17 @@ async function advanceTo(index){
   showScreen("question-screen");
 }
 
+const OPT_SHAPES = [
+  {cls:"opt-red", icon:"▲"},
+  {cls:"opt-blue", icon:"◆"},
+  {cls:"opt-gold", icon:"●"},
+  {cls:"opt-green", icon:"■"}
+];
+
 function renderQuestion(){
   const q = questions[session.current_index];
   document.getElementById("q-progress").textContent = `문제 ${session.current_index+1} / ${questions.length}`;
+  document.getElementById("progress-bar-inner").style.width = Math.round((session.current_index/questions.length)*100) + "%";
   document.getElementById("reveal-btn").disabled = false;
   document.getElementById("reveal-btn").textContent = "정답 공개";
   document.getElementById("next-btn").disabled = true;
@@ -475,21 +594,22 @@ function renderQuestion(){
     return `<span class="${isPunct?'punct':''}">${c===" "?"":escapeHtml(c)}</span>`;
   }).join("");
 
-  // 옵션 렌더링
+  // 옵션 렌더링 (카훗 스타일 색상 + 도형 아이콘)
   const optWrap = document.getElementById("options-grid");
   if(q.type === "ox"){
     optWrap.className = "options-grid ox";
+    const oxShape = { "O": {cls:"opt-green", icon:"●"}, "X": {cls:"opt-red", icon:"✕"} };
     optWrap.innerHTML = ["O","X"].map(v=>`
-      <div class="option-box" data-val="${v}">
-        <div>${v}</div>
+      <div class="option-box ${oxShape[v].cls}" data-val="${v}">
+        <div><span class="opt-icon">${oxShape[v].icon}</span>${v}</div>
         <div class="count-num" data-count="${v}">0표</div>
         <div class="count-bar" data-bar="${v}" style="width:0%"></div>
       </div>`).join("");
   } else {
     optWrap.className = "options-grid";
-    optWrap.innerHTML = q.options.map(v=>`
-      <div class="option-box" data-val="${escapeHtml(v)}">
-        <div>${escapeHtml(v)}</div>
+    optWrap.innerHTML = q.options.map((v,i)=>`
+      <div class="option-box ${OPT_SHAPES[i%4].cls}" data-val="${escapeHtml(v)}">
+        <div><span class="opt-icon">${OPT_SHAPES[i%4].icon}</span>${escapeHtml(v)}</div>
         <div class="count-num" data-count="${escapeHtml(v)}">0표</div>
         <div class="count-bar" data-bar="${escapeHtml(v)}" style="width:0%"></div>
       </div>`).join("");
@@ -498,6 +618,7 @@ function renderQuestion(){
   // 타이머 (auto 모드)
   clearInterval(timerInterval);
   const badge = document.getElementById("timer-badge");
+  badge.classList.remove("urgent");
   if(session.advance_mode === "auto"){
     let remaining = session.time_limit;
     badge.style.display = "inline-block";
@@ -505,6 +626,7 @@ function renderQuestion(){
     timerInterval = setInterval(()=>{
       remaining--;
       badge.textContent = Math.max(remaining,0) + "초";
+      badge.classList.toggle("urgent", remaining<=5 && remaining>0);
       if(remaining<=0){
         clearInterval(timerInterval);
         revealAnswer();
@@ -541,7 +663,7 @@ function updateAnswerCounts(){
 }
 function cssEscape(v){ return v.replace(/"/g,'\\"'); }
 
-// 카훗처럼: 전체 참여자 닉네임 + 실시간 답변 완료 현황
+// 카훗처럼: 전체 참여자 닉네임(아바타) + 실시간 답변 완료 현황
 function renderAnswerProgress(){
   const wrap = document.getElementById("answer-progress");
   if(session.mode !== "individual" || players.length===0){ wrap.innerHTML = ""; return; }
@@ -549,8 +671,11 @@ function renderAnswerProgress(){
   const answeredIds = new Set(relevant.map(a=>a.player_id));
   const doneCount = players.filter(p=>answeredIds.has(p.id)).length;
   wrap.innerHTML = `
-    <div class="progress-label">답변 완료: ${doneCount} / ${players.length}명</div>
-    <div class="chip-row">${players.map(p=>`<span class="progress-chip ${answeredIds.has(p.id)?'done':''}">${escapeHtml(p.nickname)}</span>`).join("")}</div>
+    <div class="progress-label">⚡ 답변 완료: ${doneCount} / ${players.length}명</div>
+    <div class="chip-row">${players.map(p=>`
+      <span class="progress-chip ${answeredIds.has(p.id)?'done':''}">
+        <span class="avatar">${avatarFor(p.nickname)}</span>${escapeHtml(p.nickname)}${answeredIds.has(p.id) ? ' ✓' : ''}
+      </span>`).join("")}</div>
   `;
 }
 
@@ -558,8 +683,14 @@ function renderAnswerProgress(){
 function renderLiveLeaderboard(){
   const el = document.getElementById("live-leaderboard");
   if(session.mode !== "individual" || players.length===0){ el.style.display = "none"; return; }
-  el.innerHTML = `<h3>현재 스코어</h3>` + players.slice(0,8).map((p,i)=>`
-    <div class="lb-row"><span><span class="rank">${i+1}</span>${escapeHtml(p.nickname)}</span><span>${p.score}점</span></div>
+  const top = players[0] ? players[0].score : 1;
+  const maxScore = Math.max(top, 1);
+  el.innerHTML = `<h3>🏅 현재 스코어</h3>` + players.slice(0,8).map((p,i)=>`
+    <div class="lb-row rank-${i+1}">
+      <div class="lb-bar" style="width:${Math.round((p.score/maxScore)*100)}%"></div>
+      <span class="lb-left"><span class="rank">${i+1}</span><span class="lb-avatar">${avatarFor(p.nickname)}</span>${escapeHtml(p.nickname)}</span>
+      <span class="lb-score">${p.score}점</span>
+    </div>
   `).join("");
   el.style.display = "block";
 }
@@ -567,16 +698,22 @@ function renderLiveLeaderboard(){
 async function revealAnswer(){
   clearInterval(timerInterval);
   const q = questions[session.current_index];
+  let anyCorrect = false;
   document.querySelectorAll(".option-box").forEach(el=>{
-    if(el.dataset.val === q.answer) el.classList.add("correct");
+    if(el.dataset.val === q.answer){ el.classList.add("correct"); }
+    else { el.classList.add("dim"); }
   });
   document.getElementById("reveal-btn").disabled = true;
   document.getElementById("next-btn").disabled = false;
 
+  const relevant = currentAnswers.filter(a=>a.question_index===session.current_index);
+  anyCorrect = relevant.some(a=>a.is_correct);
+  if(anyCorrect) fireConfetti(50);
+
   if(q.explain){
     const note = document.createElement("h2");
     note.className = "explain";
-    note.textContent = "해설: " + q.explain;
+    note.textContent = "📝 해설: " + q.explain;
     document.getElementById("question-screen").appendChild(note);
   }
 
@@ -600,6 +737,24 @@ async function nextQuestion(){
   }
 }
 
+function renderPodium(top3){
+  const el = document.getElementById("final-podium");
+  if(top3.length===0){ el.innerHTML = ""; return; }
+  const order = [
+    {p:top3[1], cls:"second"},
+    {p:top3[0], cls:"first"},
+    {p:top3[2], cls:"third"}
+  ];
+  el.innerHTML = order.filter(o=>o.p).map(o=>`
+    <div class="podium-slot ${o.cls}">
+      <div class="p-avatar">${avatarFor(o.p.nickname)}</div>
+      <div class="p-name">${escapeHtml(o.p.nickname)}</div>
+      <div class="p-score">${o.p.score}점</div>
+      <div class="p-bar">${o.cls==="first"?"🥇":o.cls==="second"?"🥈":"🥉"}</div>
+    </div>
+  `).join("");
+}
+
 async function endGame(){
   await updateDoc(doc(db, "quiz_sessions", session.id), { status:"finished" });
   session = { ...session, status:"finished" };
@@ -607,10 +762,18 @@ async function endGame(){
     const q2 = query(collection(db, "quiz_sessions", session.id, "players"), orderBy("score","desc"));
     const snap = await getDocs(q2);
     players = snap.docs.map(d=>({ id:d.id, ...d.data() }));
-    document.getElementById("final-leaderboard").innerHTML = players.slice(0,10).map((p,i)=>`
-      <div class="lb-row"><span><span class="rank">${i+1}</span>${escapeHtml(p.nickname)}</span><span>${p.score}점</span></div>
-    `).join("") || "<p>참여한 학생이 없습니다.</p>";
+    renderPodium(players.slice(0,3));
+    const maxScore = Math.max(players[0] ? players[0].score : 1, 1);
+    document.getElementById("final-leaderboard").innerHTML = players.slice(3,10).map((p,i)=>`
+      <div class="lb-row rank-${i+4}">
+        <div class="lb-bar" style="width:${Math.round((p.score/maxScore)*100)}%"></div>
+        <span class="lb-left"><span class="rank">${i+4}</span><span class="lb-avatar">${avatarFor(p.nickname)}</span>${escapeHtml(p.nickname)}</span>
+        <span class="lb-score">${p.score}점</span>
+      </div>
+    `).join("") || (players.length===0 ? "<p style='text-align:center;'>참여한 학생이 없습니다.</p>" : "");
+    if(players.length>0) fireConfetti(120);
   } else {
+    document.getElementById("final-podium").innerHTML = "";
     document.getElementById("final-leaderboard").innerHTML = "<p style='text-align:center;color:var(--ink-soft);'>다같이 풀이 모드는 점수를 집계하지 않습니다.</p>";
   }
   showScreen("final-screen");
