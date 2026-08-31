@@ -181,6 +181,7 @@ let player = null;    // {id, nickname, score}
 let answeredIndex = -1;
 let streak = 0;
 let unsubSession = null;
+let studentTimerInterval = null;
 
 function showScreen(id){
   document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
@@ -333,13 +334,32 @@ function renderQuestion(){
     grid.innerHTML = q.options.map((v,i)=>`<button class="answer-btn ${OPT_SHAPES[i%4].cls}" onclick="submitAnswer('${escapeHtml(v)}')"><span class="opt-icon">${OPT_SHAPES[i%4].icon}</span>${escapeHtml(v)}</button>`).join("");
   }
   const timerEl = document.getElementById("timer-mini");
+  clearInterval(studentTimerInterval);
   if(session.advance_mode === "auto"){
     timerEl.style.display = "inline-block";
     timerEl.className = "timer-mini";
-    timerEl.textContent = "⏱ 제한 시간 " + session.time_limit + "초";
+    startCountdown(timerEl);
   } else {
     timerEl.style.display = "none";
   }
+}
+
+// 교사 화면과 마찬가지로 실제로 초마다 줄어드는 카운트다운을 보여준다.
+// question_started_at(서버 시각) 기준 경과 시간으로 계산해서, 학생 기기가
+// 문제 화면을 조금 늦게 받아도 교사 화면과 크게 어긋나지 않게 한다.
+function startCountdown(timerEl){
+  const limit = session.time_limit || 20;
+  const startedAtMs = (session.question_started_at && typeof session.question_started_at.toMillis === "function")
+    ? session.question_started_at.toMillis() : Date.now();
+  function tick(){
+    const elapsed = (Date.now() - startedAtMs) / 1000;
+    const remaining = Math.max(0, Math.ceil(limit - elapsed));
+    timerEl.textContent = "⏱ 제한 시간 " + remaining + "초";
+    timerEl.classList.toggle("urgent", remaining <= 5 && remaining > 0);
+    if(remaining <= 0) clearInterval(studentTimerInterval);
+  }
+  tick();
+  studentTimerInterval = setInterval(tick, 1000);
 }
 
 // 빨리 맞힐수록 고득점: 문제 시작 시각(question_started_at) 대비 경과 시간에 따라
@@ -359,6 +379,7 @@ function calcPoints(isCorrect){
 }
 
 async function submitAnswer(val){
+  clearInterval(studentTimerInterval);
   // 버튼 텍스트는 도형 아이콘(▲◆●■✕)이 앞에 붙어있으므로 떼고 비교한다.
   document.querySelectorAll(".answer-btn").forEach(b=>{
     b.disabled = true;
