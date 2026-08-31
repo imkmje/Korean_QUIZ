@@ -57,12 +57,12 @@ h1{ font-family:'Noto Serif KR',serif; font-weight:900; font-size:26px; margin-b
 
 input{
   font-size:20px; padding:14px 16px; border:3px solid var(--ink); border-radius:10px;
-  width:100%; max-width:320px; margin-bottom:14px; background:#fff;
+  width:100%; max-width:320px; margin:0 auto 14px; background:#fff;
   box-shadow:3px 3px 0 var(--shadow-c);
 }
 .btn{
   font-weight:900; font-size:18px; padding:16px 36px; border-radius:12px; border:3px solid var(--shadow-c);
-  background:var(--navy); color:#fff; cursor:pointer; width:100%; max-width:320px;
+  background:var(--navy); color:#fff; cursor:pointer; width:100%; max-width:320px; margin:0 auto;
   box-shadow:4px 4px 0 var(--shadow-c); transition:transform .1s ease, box-shadow .1s ease;
 }
 .btn:active{ transform:translate(3px,3px); box-shadow:1px 1px 0 var(--shadow-c); }
@@ -71,13 +71,13 @@ input{
 .mascot{ font-size:56px; margin-bottom:6px; animation:floaty 2.6s ease-in-out infinite; }
 
 .q-prompt{
-  font-family:'Noto Serif KR',serif; font-size:22px; line-height:1.6; margin-bottom:24px;
+  font-family:'Noto Serif KR',serif; font-size:22px; line-height:1.6; margin:0 auto 24px;
   border:3px solid var(--ink); border-radius:14px; padding:20px; background:#fff; max-width:480px;
   box-shadow:4px 4px 0 var(--shadow-c);
 }
 .timer-mini{ font-weight:900; color:#fff; background:var(--red); font-size:16px; margin-bottom:14px; padding:6px 16px; border-radius:16px; border:2px solid var(--ink); }
 .timer-mini.urgent{ background:var(--red-deep); animation:shakeUrgent .5s ease-in-out infinite; }
-.answer-grid{ display:grid; gap:14px; width:100%; max-width:380px; }
+.answer-grid{ display:grid; gap:14px; width:100%; max-width:380px; margin:0 auto; }
 .answer-grid.ox{ grid-template-columns:1fr 1fr; }
 .answer-btn{
   border:3px solid var(--ink); border-radius:16px; padding:28px 10px; font-size:22px; font-weight:900;
@@ -104,7 +104,7 @@ input{
 }
 .result-stamp.correct{ color:var(--green-deep); border-color:var(--green-deep); }
 .result-stamp.wrong{ color:var(--red-deep); border-color:var(--red-deep); }
-.result-answer{ color:var(--ink-soft); margin-bottom:10px; max-width:340px; }
+.result-answer{ color:var(--ink-soft); margin:0 auto 10px; max-width:340px; }
 .streak-badge{
   display:inline-flex; align-items:center; gap:6px; background:var(--gold); color:var(--ink); font-weight:900;
   padding:8px 18px; border-radius:20px; border:3px solid var(--ink); margin-bottom:14px; box-shadow:3px 3px 0 var(--shadow-c);
