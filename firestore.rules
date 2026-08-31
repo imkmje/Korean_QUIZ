@@ -1,0 +1,53 @@
+rules_version = '2';
+
+// ============================================================
+// 맞춤법 퀴즈 게임 — Firestore 보안 규칙
+// Firebase 콘솔 → Firestore Database → 규칙(Rules) 탭에 이 내용 전체를
+// 붙여넣고 "게시"하세요.
+//
+// 교실용 경량 보호 수준입니다. 로그인 없이(익명) 학생 기기가 접속하기
+// 때문에 "진짜 교사인지"를 규칙 레벨에서 완벽히 구분할 방법이 없습니다.
+// teacher.html의 PIN은 화면 접근만 막는 정도이며, 브라우저 개발자도구를
+// 열면 이론적으로 우회가 가능합니다. 성적 반영용 등 민감한 용도에는
+// 쓰지 마세요.
+// ============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /quiz_sessions/{sessionId} {
+      allow read: if true;
+      allow create, update: if true;
+      allow delete: if false;
+
+      match /players/{playerId} {
+        allow read: if true;
+        allow create, update: if true;
+        allow delete: if false;
+      }
+
+      match /answers/{answerId} {
+        allow read: if true;
+        allow create: if true;
+        allow update: if false; // 답변은 문서 ID(플레이어+문항)로 1회만 생성, 수정 불가
+        allow delete: if false;
+      }
+    }
+  }
+}
+
+// ============================================================
+// 컬렉션 구조 (참고용 — 코드가 자동으로 만들어주므로 직접 만들 필요 없음)
+//
+// quiz_sessions/{sessionId}
+//   room_code: string, status: string, mode: string,
+//   advance_mode: string, time_limit: number, current_index: number,
+//   questions: array, created_at: timestamp
+//
+//   /players/{playerId}
+//     nickname: string, score: number, joined_at: timestamp
+//
+//   /answers/{playerId_questionIndex}   ← 문서 ID를 "플레이어ID_문항번호"로
+//     player_id: string, question_index: number, answer: string,
+//     is_correct: boolean, answered_at: timestamp
+// ============================================================

@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>맞춤법 퀴즈 참여</title>
+</head>
+<body>
+<script>
+// ============================================================
+// 0. 설정값 — teacher.html과 반드시 동일한 firebaseConfig를 넣으세요.
+// ============================================================
+window.FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBc-MInOe_Yki6XfeB2wHyB6VThnUzCN28",
+  authDomain: "spelling-quiz-60f3e.firebaseapp.com",
+  projectId: "spelling-quiz-60f3e",
+  storageBucket: "spelling-quiz-60f3e.firebasestorage.app",
+  messagingSenderId: "15247439897",
+  appId: "1:15247439897:web:e6fc2c80248dfeee8f5288"
+};
+</script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap');
+:root{
+  --paper:#FAF7F0; --grid:#DCD3BC; --ink:#262220; --ink-soft:#5B5348;
+  --red:#C43B2C; --navy:#2E3A4F; --green-stamp:#5C7A50;
+}
+*{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
+body{
+  background:var(--paper); color:var(--ink); font-family:'Noto Sans KR',sans-serif;
+  min-height:100vh; overscroll-behavior:none;
+}
+.screen{ display:none; min-height:100vh; flex-direction:column; align-items:center; justify-content:center; padding:24px; text-align:center;}
+.screen.active{ display:flex; }
+h1{ font-family:'Noto Serif KR',serif; font-size:24px; margin-bottom:16px; }
+input{
+  font-size:20px; padding:14px 16px; border:2px solid var(--ink); border-radius:8px;
+  width:100%; max-width:320px; margin-bottom:14px; background:#fff;
+}
+.btn{
+  font-weight:700; font-size:18px; padding:16px 36px; border-radius:10px; border:none;
+  background:var(--navy); color:#fff; cursor:pointer; width:100%; max-width:320px;
+}
+.btn:active{ transform:scale(0.97); }
+.btn:disabled{ opacity:.4; }
+#join-error, #answer-status{ color:var(--red); font-weight:700; min-height:20px; margin-top:4px;}
+
+.q-prompt{
+  font-family:'Noto Serif KR',serif; font-size:22px; line-height:1.6; margin-bottom:28px;
+  border:2px solid var(--ink); border-radius:10px; padding:20px; background:#fff; max-width:480px;
+}
+.timer-mini{ font-weight:900; color:var(--red); font-size:18px; margin-bottom:14px; }
+.answer-grid{ display:grid; gap:14px; width:100%; max-width:360px; }
+.answer-grid.ox{ grid-template-columns:1fr 1fr; }
+.answer-btn{
+  border:3px solid var(--ink); border-radius:14px; padding:26px 10px; font-size:22px; font-weight:700;
+  background:#fff; cursor:pointer;
+}
+.answer-btn.picked{ background:var(--navy); color:#fff; border-color:var(--navy); }
+.answer-btn:disabled{ opacity:.55; }
+
+.result-stamp{
+  width:130px; height:130px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-family:'Noto Serif KR',serif; font-size:60px; font-weight:900; margin-bottom:16px; border:8px solid;
+  transform:rotate(-6deg);
+}
+.result-stamp.correct{ color:var(--green-stamp); border-color:var(--green-stamp); }
+.result-stamp.wrong{ color:var(--red); border-color:var(--red); }
+.result-answer{ color:var(--ink-soft); margin-bottom:6px; }
+.score-line{ font-family:'Noto Serif KR',serif; font-size:20px; margin-top:10px; }
+.rank-line{ color:var(--ink-soft); margin-top:6px; }
+</style>
+
+<!-- ============ 참여 화면 ============ -->
+<div id="join-screen" class="screen active">
+  <h1>맞춤법 퀴즈</h1>
+  <input id="room-input" type="text" placeholder="방 코드 6자리" maxlength="6" style="text-transform:uppercase;">
+  <input id="nickname-input" type="text" placeholder="닉네임" maxlength="10">
+  <button class="btn" onclick="joinSession()">참여하기</button>
+  <div id="join-error"></div>
+</div>
+
+<!-- ============ 대기 화면 ============ -->
+<div id="waiting-screen" class="screen">
+  <h1 id="waiting-title">선생님이 시작하기를 기다리는 중...</h1>
+  <p style="color:var(--ink-soft);">화면을 앞에 있는 교실 화면과 함께 봐주세요.</p>
+</div>
+
+<!-- ============ 문제 화면 ============ -->
+<div id="answer-screen" class="screen">
+  <div class="timer-mini" id="timer-mini" style="display:none;"></div>
+  <div class="q-prompt" id="q-prompt-student"></div>
+  <div class="answer-grid" id="answer-grid"></div>
+  <div id="answer-status"></div>
+</div>
+
+<!-- ============ 정답 공개 화면 ============ -->
+<div id="reveal-screen" class="screen">
+  <div class="result-stamp" id="result-stamp"></div>
+  <div class="result-answer" id="result-answer-text"></div>
+  <div class="score-line" id="score-line"></div>
+</div>
+
+<!-- ============ 종료 화면 ============ -->
+<div id="student-final-screen" class="screen">
+  <h1>퀴즈가 끝났습니다</h1>
+  <div class="score-line" id="final-score-line"></div>
+  <div class="rank-line" id="final-rank-line"></div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+import {
+  getFirestore, collection, doc, addDoc, setDoc, updateDoc, getDoc, getDocs,
+  onSnapshot, query, where, orderBy, serverTimestamp, increment
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+const app = initializeApp(window.FIREBASE_CONFIG);
+const db = getFirestore(app);
+
+let session = null;   // {id, room_code, status, mode, advance_mode, time_limit, current_index, questions}
+let player = null;    // {id, nickname, score}
+let answeredIndex = -1;
+let unsubSession = null;
+
+function showScreen(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+}
+
+// URL의 ?room= 값 자동 채우기
+const params = new URLSearchParams(location.search);
+if(params.get("room")){
+  document.getElementById("room-input").value = params.get("room").toUpperCase();
+}
+// 새로고침 시 재접속 지원
+const saved = sessionStorage.getItem("quiz_player");
+if(saved){
+  try{
+    const s = JSON.parse(saved);
+    rejoin(s.sessionId, s.playerId);
+  }catch(e){}
+}
+
+async function joinSession(){
+  const errEl = document.getElementById("join-error");
+  errEl.textContent = "";
+  const roomCode = document.getElementById("room-input").value.trim().toUpperCase();
+  const nickname = document.getElementById("nickname-input").value.trim();
+  if(!roomCode || !nickname){
+    errEl.textContent = "방 코드와 닉네임을 모두 입력해주세요.";
+    return;
+  }
+
+  const q = query(collection(db, "quiz_sessions"), where("room_code", "==", roomCode));
+  const snap = await getDocs(q);
+  if(snap.empty){
+    errEl.textContent = "해당 방 코드를 찾을 수 없습니다. 다시 확인해주세요.";
+    return;
+  }
+  const sessDoc = snap.docs[0];
+  const sessData = sessDoc.data();
+  if(sessData.status === "finished"){
+    errEl.textContent = "이미 종료된 퀴즈입니다.";
+    return;
+  }
+
+  let playerRef;
+  try{
+    playerRef = await addDoc(collection(db, "quiz_sessions", sessDoc.id, "players"), {
+      nickname, score: 0, joined_at: serverTimestamp()
+    });
+  }catch(e){
+    errEl.textContent = "참여 실패: " + e.message;
+    return;
+  }
+
+  session = { id: sessDoc.id, ...sessData };
+  player = { id: playerRef.id, nickname, score: 0 };
+  sessionStorage.setItem("quiz_player", JSON.stringify({sessionId:session.id, playerId:player.id}));
+  startListening();
+  renderForStatus();
+}
+
+async function rejoin(sessionId, playerId){
+  const sessSnap = await getDoc(doc(db, "quiz_sessions", sessionId));
+  const playerSnap = await getDoc(doc(db, "quiz_sessions", sessionId, "players", playerId));
+  if(!sessSnap.exists() || !playerSnap.exists()) return;
+  session = { id: sessSnap.id, ...sessSnap.data() };
+  player = { id: playerSnap.id, ...playerSnap.data() };
+  startListening();
+  renderForStatus();
+}
+
+function startListening(){
+  unsubSession = onSnapshot(doc(db, "quiz_sessions", session.id), snap=>{
+    if(!snap.exists()) return;
+    session = { id: snap.id, ...snap.data() };
+    renderForStatus();
+  });
+}
+
+function renderForStatus(){
+  if(session.status === "lobby"){
+    showScreen("waiting-screen");
+  } else if(session.status === "active"){
+    if(answeredIndex === session.current_index){
+      document.getElementById("waiting-title").textContent = "제출 완료! 다음을 기다리는 중...";
+      showScreen("waiting-screen");
+    } else {
+      renderQuestion();
+      showScreen("answer-screen");
+    }
+  } else if(session.status === "reveal"){
+    renderReveal();
+    showScreen("reveal-screen");
+  } else if(session.status === "finished"){
+    renderFinal();
+    showScreen("student-final-screen");
+  }
+}
+
+function renderQuestion(){
+  const q = session.questions[session.current_index];
+  document.getElementById("q-prompt-student").textContent = q.prompt;
+  document.getElementById("answer-status").textContent = "";
+  const grid = document.getElementById("answer-grid");
+  if(q.type === "ox"){
+    grid.className = "answer-grid ox";
+    grid.innerHTML = ["O","X"].map(v=>`<button class="answer-btn" onclick="submitAnswer('${v}')">${v}</button>`).join("");
+  } else {
+    grid.className = "answer-grid";
+    grid.innerHTML = q.options.map(v=>`<button class="answer-btn" onclick="submitAnswer('${escapeHtml(v)}')">${escapeHtml(v)}</button>`).join("");
+  }
+  const timerEl = document.getElementById("timer-mini");
+  if(session.advance_mode === "auto"){
+    timerEl.style.display = "block";
+    timerEl.textContent = "제한 시간 " + session.time_limit + "초";
+  } else {
+    timerEl.style.display = "none";
+  }
+}
+
+async function submitAnswer(val){
+  document.querySelectorAll(".answer-btn").forEach(b=>{ b.disabled = true; if(b.textContent===val) b.classList.add("picked"); });
+  const q = session.questions[session.current_index];
+  const isCorrect = (val === q.answer);
+
+  // 문서 ID를 "플레이어ID_문항번호"로 고정 → 같은 문항에 중복 제출 방지
+  const answerId = `${player.id}_${session.current_index}`;
+  try{
+    await setDoc(doc(db, "quiz_sessions", session.id, "answers", answerId), {
+      player_id: player.id, question_index: session.current_index,
+      answer: val, is_correct: isCorrect, answered_at: serverTimestamp()
+    });
+  }catch(e){
+    document.getElementById("answer-status").textContent = "제출 실패: 오류가 발생했습니다.";
+    return;
+  }
+  answeredIndex = session.current_index;
+  if(isCorrect){
+    await updateDoc(doc(db, "quiz_sessions", session.id, "players", player.id), { score: increment(1) });
+  }
+  document.getElementById("waiting-title").textContent = "제출 완료! 다음을 기다리는 중...";
+  showScreen("waiting-screen");
+}
+
+async function renderReveal(){
+  const q = session.questions[session.current_index];
+  const stamp = document.getElementById("result-stamp");
+  if(answeredIndex === session.current_index){
+    await checkMyAnswer();
+  } else {
+    stamp.textContent = "－";
+    stamp.className = "result-stamp wrong";
+    document.getElementById("score-line").textContent = "";
+  }
+  document.getElementById("result-answer-text").textContent = `정답: ${q.answer}` + (q.explain ? ` (${q.explain})` : "");
+}
+
+async function checkMyAnswer(){
+  const answerId = `${player.id}_${session.current_index}`;
+  const snap = await getDoc(doc(db, "quiz_sessions", session.id, "answers", answerId));
+  const stamp = document.getElementById("result-stamp");
+  if(snap.exists() && snap.data().is_correct){
+    stamp.textContent = "O";
+    stamp.className = "result-stamp correct";
+  } else {
+    stamp.textContent = "X";
+    stamp.className = "result-stamp wrong";
+  }
+  const meSnap = await getDoc(doc(db, "quiz_sessions", session.id, "players", player.id));
+  const myScore = meSnap.exists() ? (meSnap.data().score || 0) : 0;
+  document.getElementById("score-line").textContent = `현재 점수: ${myScore}점`;
+}
+
+async function renderFinal(){
+  const meSnap = await getDoc(doc(db, "quiz_sessions", session.id, "players", player.id));
+  const myScore = meSnap.exists() ? (meSnap.data().score || 0) : 0;
+  document.getElementById("final-score-line").textContent = `내 점수: ${myScore}점`;
+
+  const q2 = query(collection(db, "quiz_sessions", session.id, "players"), orderBy("score","desc"));
+  const allSnap = await getDocs(q2);
+  const all = allSnap.docs.map(d=>({ id:d.id, ...d.data() }));
+  const rank = all.findIndex(p=>p.id===player.id) + 1;
+  document.getElementById("final-rank-line").textContent = `전체 ${all.length}명 중 ${rank}등`;
+
+  sessionStorage.removeItem("quiz_player");
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+window.joinSession = joinSession;
+window.submitAnswer = submitAnswer;
+</script>
+</body>
+</html>

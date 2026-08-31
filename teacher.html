@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>맞춤법 퀴즈 — 교사 화면</title>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+</head>
+<body>
+<script>
+// ============================================================
+// 0. 설정값 (배포 전 필수 수정)
+// ============================================================
+window.FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBc-MInOe_Yki6XfeB2wHyB6VThnUzCN28",
+  authDomain: "spelling-quiz-60f3e.firebaseapp.com",
+  projectId: "spelling-quiz-60f3e",
+  storageBucket: "spelling-quiz-60f3e.firebasestorage.app",
+  messagingSenderId: "15247439897",
+  appId: "1:15247439897:web:e6fc2c80248dfeee8f5288"
+};
+window.TEACHER_PIN = "1234";                                    // 교사 화면 접근 PIN (자유롭게 변경)
+window.STUDENT_PAGE_URL = "https://imkmje.github.io/Korean_QUIZ/student.html"; // 배포된 student.html 주소
+</script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap');
+
+:root{
+  --paper:#FAF7F0;
+  --paper-dim:#F1EBDD;
+  --grid:#DCD3BC;
+  --ink:#262220;
+  --ink-soft:#5B5348;
+  --red:#C43B2C;
+  --red-deep:#9E2E22;
+  --navy:#2E3A4F;
+  --navy-soft:#4A5A73;
+  --green-stamp:#5C7A50;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:'Noto Sans KR', sans-serif;
+  min-height:100vh;
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 34px 34px;
+  background-position: -1px -1px;
+}
+.screen{ display:none; min-height:100vh; flex-direction:column; align-items:center; justify-content:center; padding:40px 24px;}
+.screen.active{ display:flex; }
+
+/* ---------- PIN 화면 ---------- */
+#pin-screen input{
+  font-size:32px; letter-spacing:12px; text-align:center; width:220px;
+  padding:14px 10px; border:3px solid var(--ink); border-radius:6px; background:var(--paper);
+  font-family:'Noto Serif KR', serif;
+}
+#pin-screen h1{ font-family:'Noto Serif KR', serif; font-size:28px; margin-bottom:24px;}
+.btn{
+  font-family:'Noto Sans KR', sans-serif; font-weight:700; font-size:18px;
+  padding:14px 32px; border-radius:8px; border:none; cursor:pointer;
+  background:var(--navy); color:var(--paper); margin-top:20px;
+  transition: transform .08s ease;
+}
+.btn:active{ transform: scale(0.97); }
+.btn.red{ background:var(--red); }
+.btn.ghost{ background:transparent; color:var(--navy); border:2px solid var(--navy); }
+.btn:disabled{ opacity:.4; cursor:not-allowed; }
+#pin-error{ color:var(--red); margin-top:10px; font-weight:700; min-height:20px;}
+
+/* ---------- 설정 화면 ---------- */
+#setup-screen{ align-items:stretch; max-width:840px; margin:0 auto; }
+.setup-card{
+  background:var(--paper); border:2px solid var(--ink); border-radius:12px;
+  padding:32px; box-shadow:6px 6px 0 var(--grid);
+}
+.setup-card h1{ font-family:'Noto Serif KR', serif; font-size:30px; margin-bottom:6px;}
+.setup-card p.sub{ color:var(--ink-soft); margin-bottom:24px;}
+.field{ margin-bottom:20px; }
+.field label{ display:block; font-weight:700; margin-bottom:8px; }
+.field-hint{ color:var(--ink-soft); font-size:13px; margin-top:6px; }
+textarea#questions-json{
+  width:100%; min-height:220px; font-family:monospace; font-size:13px;
+  padding:12px; border:2px solid var(--grid); border-radius:8px; background:#fff;
+}
+.toggle-row{ display:flex; gap:10px; flex-wrap:wrap; }
+.toggle-option{
+  flex:1; min-width:180px; border:2px solid var(--grid); border-radius:10px; padding:14px;
+  cursor:pointer; background:#fff;
+}
+.toggle-option.selected{ border-color:var(--red); background:#FBEDE9; }
+.toggle-option strong{ display:block; margin-bottom:4px; }
+.toggle-option span{ font-size:13px; color:var(--ink-soft); }
+#time-limit-field{ display:none; }
+input[type=number]{ font-size:16px; padding:8px 12px; border:2px solid var(--grid); border-radius:6px; width:100px;}
+#setup-error{ color:var(--red); font-weight:700; min-height:20px; margin-top:10px;}
+
+/* ---------- 로비 화면 ---------- */
+#lobby-screen{ text-align:center; }
+.room-code-box{
+  background:var(--navy); color:var(--paper); font-family:'Noto Serif KR', serif;
+  font-size:56px; font-weight:700; letter-spacing:10px; padding:18px 40px;
+  border-radius:12px; margin:20px 0;
+}
+#qr-canvas{ background:#fff; padding:16px; border-radius:12px; border:2px solid var(--ink); margin:10px 0;}
+.join-url{ color:var(--ink-soft); font-size:14px; margin-bottom:20px; word-break:break-all; }
+#player-list{
+  display:flex; flex-wrap:wrap; gap:10px; justify-content:center; max-width:800px; margin:24px 0;
+}
+.player-chip{
+  background:#fff; border:2px solid var(--ink); border-radius:20px; padding:8px 18px; font-weight:700;
+}
+#player-count{ font-family:'Noto Serif KR', serif; font-size:20px; margin-bottom:8px; }
+
+/* ---------- 문제 화면 (원고지) ---------- */
+#question-screen{ width:100%; max-width:1000px; }
+.q-topbar{ display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:20px; }
+.q-progress{ font-weight:700; color:var(--ink-soft); }
+.timer-badge{
+  background:var(--red); color:#fff; font-weight:900; font-size:20px;
+  padding:6px 18px; border-radius:20px; display:none;
+}
+.manuscript{
+  display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin:20px 0 34px;
+}
+.manuscript span{
+  width:52px; height:52px; border:2px solid var(--ink); border-radius:4px;
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Noto Serif KR', serif; font-size:26px; background:#fff;
+}
+.manuscript span.punct{ border-color:transparent; width:20px; }
+
+.options-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; width:100%; }
+.options-grid.ox{ grid-template-columns:1fr 1fr; max-width:500px; margin:0 auto; }
+.option-box{
+  border:3px solid var(--ink); border-radius:12px; padding:22px; text-align:center;
+  font-size:22px; font-weight:700; background:#fff; position:relative;
+}
+.option-box .count-bar{
+  position:absolute; left:0; bottom:0; height:6px; background:var(--navy-soft); border-radius:0 0 8px 8px;
+  transition:width .3s ease;
+}
+.option-box .count-num{ font-size:14px; color:var(--ink-soft); font-weight:400; margin-top:4px; }
+.option-box.correct{ border-color:var(--green-stamp); background:#EEF3EC; }
+.option-box.correct::after{ content:"✓ 정답"; position:absolute; top:-14px; right:10px; background:var(--green-stamp); color:#fff; font-size:12px; padding:3px 10px; border-radius:10px; }
+
+.control-bar{ display:flex; gap:14px; margin-top:30px; }
+
+/* ---------- 정답 공개 / 리더보드 ---------- */
+.leaderboard{ width:100%; max-width:600px; }
+.lb-row{
+  display:flex; justify-content:space-between; align-items:center; background:#fff;
+  border:2px solid var(--ink); border-radius:10px; padding:14px 20px; margin-bottom:10px; font-weight:700;
+}
+.lb-row .rank{ color:var(--red); margin-right:14px; font-family:'Noto Serif KR', serif; font-size:22px; }
+
+h2.explain{ font-family:'Noto Serif KR', serif; font-weight:500; font-size:20px; color:var(--ink-soft); margin-top:16px; text-align:center; }
+
+@media (max-width:640px){
+  .manuscript span{ width:38px; height:38px; font-size:19px; }
+  .room-code-box{ font-size:36px; padding:14px 24px; letter-spacing:6px;}
+  .options-grid{ grid-template-columns:1fr; }
+}
+</style>
+
+<!-- ============ PIN 화면 ============ -->
+<div id="pin-screen" class="screen active">
+  <h1>맞춤법 퀴즈 · 교사 화면</h1>
+  <input id="pin-input" type="password" inputmode="numeric" maxlength="6" placeholder="····">
+  <div id="pin-error"></div>
+  <button class="btn" onclick="checkPin()">입장</button>
+</div>
+
+<!-- ============ 설정 화면 ============ -->
+<div id="setup-screen" class="screen">
+  <div class="setup-card">
+    <h1>새 퀴즈 세션 만들기</h1>
+    <p class="sub">문제, 진행 방식을 정하고 세션을 시작하세요.</p>
+
+    <div class="field">
+      <label>참여 방식</label>
+      <div class="toggle-row">
+        <div class="toggle-option selected" data-mode="individual" onclick="selectMode('individual')">
+          <strong>개인 참여 모드</strong>
+          <span>학생 각자 폰으로 QR 접속, 점수·순위 집계</span>
+        </div>
+        <div class="toggle-option" data-mode="display_only" onclick="selectMode('display_only')">
+          <strong>다같이 풀이 모드</strong>
+          <span>기기 없이 화면만 보고 다같이 진행, 점수 없음</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>문제 진행 방식</label>
+      <div class="toggle-row">
+        <div class="toggle-option selected" data-advance="manual" onclick="selectAdvance('manual')">
+          <strong>수동 진행</strong>
+          <span>교사가 버튼을 눌러 다음 문제로</span>
+        </div>
+        <div class="toggle-option" data-advance="auto" onclick="selectAdvance('auto')">
+          <strong>자동 진행</strong>
+          <span>제한 시간이 끝나면 자동으로 다음 문제로</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="field" id="time-limit-field">
+      <label>문항당 제한 시간(초)</label>
+      <input type="number" id="time-limit-input" value="20" min="5" max="120">
+    </div>
+
+    <div class="field">
+      <label>문제 목록 (JSON)</label>
+      <textarea id="questions-json"></textarea>
+      <div class="field-hint">type은 "ox" 또는 "mc". mc는 options 4개 필요. 아래 기본 20문항 예시가 채워져 있습니다 — 직접 수정해서 쓰세요.</div>
+    </div>
+
+    <div id="setup-error"></div>
+    <button class="btn red" onclick="createSession()">세션 만들기</button>
+  </div>
+</div>
+
+<!-- ============ 로비 화면 ============ -->
+<div id="lobby-screen" class="screen">
+  <h1 style="font-family:'Noto Serif KR',serif;">학생들을 기다리는 중</h1>
+  <div class="room-code-box" id="room-code-display"></div>
+  <canvas id="qr-canvas"></canvas>
+  <div class="join-url" id="join-url-display"></div>
+  <div id="player-count">참여 인원: 0명</div>
+  <div id="player-list"></div>
+  <div class="control-bar">
+    <button class="btn red" onclick="startGame()">퀴즈 시작</button>
+  </div>
+</div>
+
+<!-- ============ 다같이 풀이 모드 로비 ============ -->
+<div id="display-lobby-screen" class="screen">
+  <h1 style="font-family:'Noto Serif KR',serif; margin-bottom:20px;">다같이 풀이 모드 준비 완료</h1>
+  <p style="color:var(--ink-soft); margin-bottom:20px;">학생 기기 접속 없이 바로 시작합니다.</p>
+  <button class="btn red" onclick="startGame()">퀴즈 시작</button>
+</div>
+
+<!-- ============ 문제 화면 ============ -->
+<div id="question-screen" class="screen">
+  <div class="q-topbar">
+    <div class="q-progress" id="q-progress"></div>
+    <div class="timer-badge" id="timer-badge"></div>
+  </div>
+  <div class="manuscript" id="manuscript-prompt"></div>
+  <div class="options-grid" id="options-grid"></div>
+  <div class="control-bar">
+    <button class="btn ghost" id="reveal-btn" onclick="revealAnswer()">정답 공개</button>
+    <button class="btn" id="next-btn" onclick="nextQuestion()" disabled>다음 문제</button>
+  </div>
+</div>
+
+<!-- ============ 종료 화면 ============ -->
+<div id="final-screen" class="screen">
+  <h1 style="font-family:'Noto Serif KR',serif; margin-bottom:24px;">최종 결과</h1>
+  <div class="leaderboard" id="final-leaderboard"></div>
+  <button class="btn" onclick="location.reload()" style="margin-top:24px;">새 세션 시작</button>
+</div>
+
+<script type="module">
+// ============================================================
+// Firebase 초기화 (Firestore)
+// ============================================================
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+import {
+  getFirestore, collection, doc, addDoc, setDoc, updateDoc, getDoc, getDocs,
+  onSnapshot, query, where, orderBy, serverTimestamp, increment
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+const app = initializeApp(window.FIREBASE_CONFIG);
+const db = getFirestore(app);
+const TEACHER_PIN = window.TEACHER_PIN;
+const STUDENT_PAGE_URL = window.STUDENT_PAGE_URL;
+
+// ============================================================
+// 1. 상태
+// ============================================================
+let session = null;         // {id, room_code, status, mode, advance_mode, time_limit, current_index, questions}
+let questions = [];
+let players = [];
+let currentAnswers = [];    // 세션 전체 답변 (문항별 필터는 렌더 시점에 처리)
+let timerInterval = null;
+let selectedMode = "individual";
+let selectedAdvance = "manual";
+let unsubSession = null, unsubPlayers = null, unsubAnswers = null;
+
+const DEFAULT_QUESTIONS = [
+  {type:"ox", prompt:"오늘은 웬지 기분이 좋다.", answer:"X", explain:"'왠지'가 올바른 표기입니다."},
+  {type:"ox", prompt:"그는 회의 안건을 결제했다.", answer:"X", explain:"승인의 의미이므로 '결재'가 맞습니다."},
+  {type:"ox", prompt:"감기가 다 낳았다.", answer:"X", explain:"병이 나은 것이므로 '나았다'가 맞습니다."},
+  {type:"ox", prompt:"그는 나와 다른 생각을 가지고 있다.", answer:"O", explain:"'다르다'의 올바른 활용입니다."},
+  {type:"ox", prompt:"그는 친구로서 나를 도와줬다.", answer:"O", explain:"자격을 뜻하는 '로서'가 맞습니다."},
+  {type:"ox", prompt:"실력으로서 승부를 봐야 한다.", answer:"X", explain:"수단을 뜻하므로 '실력으로써'가 맞습니다."},
+  {type:"ox", prompt:"너 커서 뭐가 돼고 싶니?", answer:"X", explain:"'되고'가 올바른 표기입니다."},
+  {type:"ox", prompt:"며칠 후에 다시 만나자.", answer:"O", explain:"'며칠'이 표준 표기입니다."},
+  {type:"ox", prompt:"오랜만이야, 잘 지냈어?", answer:"O", explain:"'오랜만'이 표준 표기입니다."},
+  {type:"ox", prompt:"넉넉치 않은 형편이었다.", answer:"X", explain:"'넉넉지'가 올바른 표기입니다."},
+  {type:"mc", prompt:"다음 중 명사형으로 올바른 표기는?", options:["설레임","설렘","설레이다","설레움"], answer:"설렘", explain:"'설렘'이 표준어입니다."},
+  {type:"mc", prompt:"다음 중 올바른 표기는?", options:["왠일이니","웬일이니","왠지니","웬지니"], answer:"웬일이니", explain:"'웬일'이 표준 표기입니다."},
+  {type:"mc", prompt:"우표를 붙여 편지를 보내는 것은?", options:["편지를 붙이다","편지를 부치다","편지를 붇이다","편지를 부지다"], answer:"편지를 부치다", explain:"우편으로 보낼 때는 '부치다'."},
+  {type:"mc", prompt:"퀴즈에서 정답을 골라내는 것은?", options:["문제를 맞추다","문제를 맞히다","문제를 맞치다","문제를 맞후다"], answer:"문제를 맞히다", explain:"정답을 골라낼 때는 '맞히다'."},
+  {type:"mc", prompt:"'꼭'이라는 뜻으로 쓰이는 표기는?", options:["반듯이","반드시","반듣이","반드기"], answer:"반드시", explain:"'꼭'의 의미일 때는 '반드시'."},
+  {type:"mc", prompt:"다음 중 표준 표기는?", options:["하마트면","하마터면","하마트믄","하마더면"], answer:"하마터면", explain:"'하마터면'이 표준 표기입니다."},
+  {type:"mc", prompt:"김치를 만들 때 올바른 표기는?", options:["김치를 담궈 먹었다","김치를 담가 먹었다","김치를 담아 먹었다","김치를 담거 먹었다"], answer:"김치를 담가 먹었다", explain:"기본형 '담그다'의 활용은 '담가'."},
+  {type:"mc", prompt:"'조금 후에'라는 뜻으로 올바른 표기는?", options:["있다가","이따가","있따가","이따가서"], answer:"이따가", explain:"시간 부사는 '이따가'."},
+  {type:"mc", prompt:"날짜를 셀 때 올바른 표기는?", options:["몇일째","며칠째","몇 일째","몇칠째"], answer:"며칠째", explain:"'며칠'이 표준 표기입니다."},
+  {type:"mc", prompt:"방법을 묻는 올바른 표기는?", options:["어떡해야 할지","어떻게 해야 할지","어떠캐야 할지","어떡케야 할지"], answer:"어떻게 해야 할지", explain:"'어떻게 해야'가 맞습니다. '어떡해'는 그 자체로 완결된 감탄 표현입니다."}
+];
+document.getElementById("questions-json").value = JSON.stringify(DEFAULT_QUESTIONS, null, 2);
+
+function showScreen(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+}
+
+// ============================================================
+// 2. PIN 게이트
+// ============================================================
+function checkPin(){
+  const val = document.getElementById("pin-input").value;
+  if(val === TEACHER_PIN){
+    showScreen("setup-screen");
+  } else {
+    document.getElementById("pin-error").textContent = "PIN이 올바르지 않습니다.";
+  }
+}
+document.getElementById("pin-input").addEventListener("keydown", e=>{ if(e.key==="Enter") checkPin(); });
+
+// ============================================================
+// 3. 설정 화면
+// ============================================================
+function selectMode(m){
+  selectedMode = m;
+  document.querySelectorAll("[data-mode]").forEach(el=>el.classList.toggle("selected", el.dataset.mode===m));
+}
+function selectAdvance(a){
+  selectedAdvance = a;
+  document.querySelectorAll("[data-advance]").forEach(el=>el.classList.toggle("selected", el.dataset.advance===a));
+  document.getElementById("time-limit-field").style.display = (a==="auto") ? "block" : "none";
+}
+
+function genRoomCode(){
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // 헷갈리는 문자(O,0,I,1) 제외
+  let code = "";
+  for(let i=0;i<6;i++) code += chars[Math.floor(Math.random()*chars.length)];
+  return code;
+}
+
+async function createSession(){
+  const errEl = document.getElementById("setup-error");
+  errEl.textContent = "";
+  let parsed;
+  try{
+    parsed = JSON.parse(document.getElementById("questions-json").value);
+    if(!Array.isArray(parsed) || parsed.length===0) throw new Error("empty");
+  }catch(e){
+    errEl.textContent = "문제 JSON 형식이 올바르지 않습니다. 예시 형식을 참고해 다시 확인해주세요.";
+    return;
+  }
+  questions = parsed;
+  const timeLimit = parseInt(document.getElementById("time-limit-input").value) || 20;
+  const roomCode = genRoomCode();
+
+  const sessionData = {
+    room_code: roomCode,
+    status: "lobby",
+    mode: selectedMode,
+    advance_mode: selectedAdvance,
+    time_limit: timeLimit,
+    current_index: -1,
+    questions: questions,
+    created_at: serverTimestamp()
+  };
+
+  let docRef;
+  try{
+    docRef = await addDoc(collection(db, "quiz_sessions"), sessionData);
+  }catch(e){
+    errEl.textContent = "세션 생성 실패: " + e.message;
+    return;
+  }
+  session = { id: docRef.id, ...sessionData };
+  subscribeSession();
+
+  if(selectedMode === "individual"){
+    document.getElementById("room-code-display").textContent = roomCode;
+    const joinUrl = `${STUDENT_PAGE_URL}?room=${roomCode}`;
+    document.getElementById("join-url-display").textContent = joinUrl;
+    QRCode.toCanvas(document.getElementById("qr-canvas"), joinUrl, {width:260, margin:1});
+    subscribePlayers();
+    showScreen("lobby-screen");
+  } else {
+    showScreen("display-lobby-screen");
+  }
+}
+
+// ============================================================
+// 4. 로비 — 참가자 실시간 구독
+// ============================================================
+function subscribePlayers(){
+  const playersRef = collection(db, "quiz_sessions", session.id, "players");
+  unsubPlayers = onSnapshot(playersRef, snap=>{
+    players = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+    renderPlayerList();
+  });
+}
+function renderPlayerList(){
+  document.getElementById("player-count").textContent = `참여 인원: ${players.length}명`;
+  document.getElementById("player-list").innerHTML = players.map(p=>`<div class="player-chip">${escapeHtml(p.nickname)}</div>`).join("");
+}
+
+// ============================================================
+// 5. 세션 상태 실시간 구독
+// ============================================================
+function subscribeSession(){
+  const sessRef = doc(db, "quiz_sessions", session.id);
+  unsubSession = onSnapshot(sessRef, snap=>{
+    if(snap.exists()) session = { id: snap.id, ...snap.data() };
+  });
+}
+
+// ============================================================
+// 6. 게임 진행
+// ============================================================
+async function startGame(){
+  await advanceTo(0);
+  if(session.mode === "individual") subscribeAnswers();
+}
+
+async function advanceTo(index){
+  try{
+    await updateDoc(doc(db, "quiz_sessions", session.id), { current_index:index, status:"active" });
+  }catch(e){
+    alert("진행 오류: "+e.message);
+    return;
+  }
+  session = { ...session, current_index:index, status:"active" };
+  currentAnswers = [];
+  renderQuestion();
+  showScreen("question-screen");
+}
+
+function renderQuestion(){
+  const q = questions[session.current_index];
+  document.getElementById("q-progress").textContent = `문제 ${session.current_index+1} / ${questions.length}`;
+  document.getElementById("reveal-btn").disabled = false;
+  document.getElementById("reveal-btn").textContent = "정답 공개";
+  document.getElementById("next-btn").disabled = true;
+
+  // 원고지 렌더링
+  const chars = q.prompt.split("");
+  document.getElementById("manuscript-prompt").innerHTML = chars.map(c=>{
+    const isPunct = /[.,!?~"']/.test(c) || c===" ";
+    return `<span class="${isPunct?'punct':''}">${c===" "?"":escapeHtml(c)}</span>`;
+  }).join("");
+
+  // 옵션 렌더링
+  const optWrap = document.getElementById("options-grid");
+  if(q.type === "ox"){
+    optWrap.className = "options-grid ox";
+    optWrap.innerHTML = ["O","X"].map(v=>`
+      <div class="option-box" data-val="${v}">
+        <div>${v}</div>
+        <div class="count-num" data-count="${v}">0표</div>
+        <div class="count-bar" data-bar="${v}" style="width:0%"></div>
+      </div>`).join("");
+  } else {
+    optWrap.className = "options-grid";
+    optWrap.innerHTML = q.options.map(v=>`
+      <div class="option-box" data-val="${escapeHtml(v)}">
+        <div>${escapeHtml(v)}</div>
+        <div class="count-num" data-count="${escapeHtml(v)}">0표</div>
+        <div class="count-bar" data-bar="${escapeHtml(v)}" style="width:0%"></div>
+      </div>`).join("");
+  }
+
+  // 타이머 (auto 모드)
+  clearInterval(timerInterval);
+  const badge = document.getElementById("timer-badge");
+  if(session.advance_mode === "auto"){
+    let remaining = session.time_limit;
+    badge.style.display = "inline-block";
+    badge.textContent = remaining + "초";
+    timerInterval = setInterval(()=>{
+      remaining--;
+      badge.textContent = Math.max(remaining,0) + "초";
+      if(remaining<=0){
+        clearInterval(timerInterval);
+        revealAnswer();
+      }
+    },1000);
+  } else {
+    badge.style.display = "none";
+  }
+}
+
+function subscribeAnswers(){
+  const answersRef = collection(db, "quiz_sessions", session.id, "answers");
+  unsubAnswers = onSnapshot(answersRef, snap=>{
+    currentAnswers = snap.docs.map(d=>d.data());
+    updateAnswerCounts();
+  });
+}
+function updateAnswerCounts(){
+  const q = questions[session.current_index];
+  const relevant = currentAnswers.filter(a=>a.question_index===session.current_index);
+  const total = relevant.length || 1;
+  const tally = {};
+  relevant.forEach(a=>{ tally[a.answer] = (tally[a.answer]||0)+1; });
+  const opts = q.type==="ox" ? ["O","X"] : q.options;
+  opts.forEach(v=>{
+    const c = tally[v]||0;
+    const pct = Math.round((c/total)*100);
+    const countEl = document.querySelector(`[data-count="${cssEscape(v)}"]`);
+    const barEl = document.querySelector(`[data-bar="${cssEscape(v)}"]`);
+    if(countEl) countEl.textContent = `${c}표`;
+    if(barEl) barEl.style.width = pct+"%";
+  });
+}
+function cssEscape(v){ return v.replace(/"/g,'\\"'); }
+
+async function revealAnswer(){
+  clearInterval(timerInterval);
+  const q = questions[session.current_index];
+  document.querySelectorAll(".option-box").forEach(el=>{
+    if(el.dataset.val === q.answer) el.classList.add("correct");
+  });
+  document.getElementById("reveal-btn").disabled = true;
+  document.getElementById("next-btn").disabled = false;
+
+  if(q.explain){
+    const note = document.createElement("h2");
+    note.className = "explain";
+    note.textContent = "해설: " + q.explain;
+    document.getElementById("question-screen").appendChild(note);
+  }
+
+  await updateDoc(doc(db, "quiz_sessions", session.id), { status:"reveal" });
+  session = { ...session, status:"reveal" };
+
+  if(session.mode === "individual"){
+    const q2 = query(collection(db, "quiz_sessions", session.id, "players"), orderBy("score","desc"));
+    const snap = await getDocs(q2);
+    players = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+  }
+}
+
+async function nextQuestion(){
+  document.querySelectorAll(".explain").forEach(el=>el.remove());
+  if(session.current_index + 1 >= questions.length){
+    await endGame();
+  } else {
+    await advanceTo(session.current_index + 1);
+  }
+}
+
+async function endGame(){
+  await updateDoc(doc(db, "quiz_sessions", session.id), { status:"finished" });
+  session = { ...session, status:"finished" };
+  if(session.mode === "individual"){
+    const q2 = query(collection(db, "quiz_sessions", session.id, "players"), orderBy("score","desc"));
+    const snap = await getDocs(q2);
+    players = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+    document.getElementById("final-leaderboard").innerHTML = players.slice(0,10).map((p,i)=>`
+      <div class="lb-row"><span><span class="rank">${i+1}</span>${escapeHtml(p.nickname)}</span><span>${p.score}점</span></div>
+    `).join("") || "<p>참여한 학생이 없습니다.</p>";
+  } else {
+    document.getElementById("final-leaderboard").innerHTML = "<p style='text-align:center;color:var(--ink-soft);'>다같이 풀이 모드는 점수를 집계하지 않습니다.</p>";
+  }
+  showScreen("final-screen");
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+// 인라인 onclick 핸들러가 참조할 수 있도록 전역에 노출
+window.checkPin = checkPin;
+window.selectMode = selectMode;
+window.selectAdvance = selectAdvance;
+window.createSession = createSession;
+window.startGame = startGame;
+window.revealAnswer = revealAnswer;
+window.nextQuestion = nextQuestion;
+</script>
+</body>
+</html>
