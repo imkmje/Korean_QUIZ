@@ -397,23 +397,21 @@ async function renderReveal(){
     streak = 0;
     stamp.textContent = "－";
     stamp.className = "result-stamp wrong";
-    document.getElementById("score-line").textContent = "";
   }
   document.getElementById("result-answer-text").textContent = `정답: ${q.answer}` + (q.explain ? ` (${q.explain})` : "");
   if(streak >= 2){
     streakWrap.innerHTML = `<div class="streak-badge">🔥 ${streak}연속 정답!</div>`;
   }
+  await showMyScore();
 }
 
 async function checkMyAnswer(){
   const answerId = `${player.id}_${session.current_index}`;
   const snap = await getDoc(doc(db, "quiz_sessions", session.id, "answers", answerId));
   const stamp = document.getElementById("result-stamp");
-  let earned = 0;
   if(snap.exists() && snap.data().is_correct){
     stamp.textContent = "O";
     stamp.className = "result-stamp correct";
-    earned = snap.data().points_earned || 0;
     streak++;
     fireConfetti(35);
   } else {
@@ -421,11 +419,13 @@ async function checkMyAnswer(){
     stamp.className = "result-stamp wrong";
     streak = 0;
   }
+}
+
+// 문제마다 획득 점수 내역 없이, 본인 현재 누적 점수만 보여준다.
+async function showMyScore(){
   const meSnap = await getDoc(doc(db, "quiz_sessions", session.id, "players", player.id));
   const myScore = meSnap.exists() ? (meSnap.data().score || 0) : 0;
-  document.getElementById("score-line").innerHTML = earned > 0
-    ? `이번 문제 <span class="num">+${earned}점</span> (빠른 정답 보너스) · 현재 점수: ${myScore}점`
-    : `현재 점수: ${myScore}점`;
+  document.getElementById("score-line").innerHTML = `현재 점수: <span class="num">${myScore}점</span>`;
 }
 
 async function renderFinal(){
