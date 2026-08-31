@@ -27,6 +27,8 @@ window.FIREBASE_CONFIG = {
   --red:#FF4B4B; --red-deep:#D62F2F; --navy:#2E3A4F;
   --green:#28C76F; --green-deep:#1B9E56; --gold:#FFC93C; --gold-deep:#EFA500;
   --blue:#3B82F6; --purple:#8B5CF6; --shadow-c:#262220;
+  /* 옵션 버튼 전용 진한 톤 — 흰 텍스트 대비(WCAG 큰 텍스트 3:1) 확보용 */
+  --opt-red:#E63946; --opt-blue:#2F6FE0; --opt-gold:#FFC93C; --opt-green:#1FA35C;
 }
 *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
 body{
@@ -82,10 +84,10 @@ input{
   color:#fff; cursor:pointer; box-shadow:4px 4px 0 var(--shadow-c); transition:transform .1s ease, box-shadow .1s ease;
 }
 .answer-btn .opt-icon{ display:block; font-size:20px; margin-bottom:4px; opacity:.9; }
-.answer-btn.opt-red{ background:var(--red); }
-.answer-btn.opt-blue{ background:var(--blue); }
-.answer-btn.opt-gold{ background:var(--gold); color:var(--ink); }
-.answer-btn.opt-green{ background:var(--green); }
+.answer-btn.opt-red{ background:var(--opt-red); }
+.answer-btn.opt-blue{ background:var(--opt-blue); }
+.answer-btn.opt-gold{ background:var(--opt-gold); color:var(--ink); }
+.answer-btn.opt-green{ background:var(--opt-green); }
 .answer-btn:active:not(:disabled){ transform:translate(3px,3px); box-shadow:1px 1px 0 var(--shadow-c); }
 .answer-btn.picked{ outline:5px solid var(--ink); outline-offset:2px; }
 .answer-btn:disabled{ opacity:.5; }
@@ -386,17 +388,27 @@ async function submitAnswer(val){
   showScreen("waiting-screen");
 }
 
+// 스탬프 O/X는 매 문제마다 새로 "쾅" 찍히는 느낌을 줘야 하는데, 연속으로 같은
+// 결과(예: 정답 2연속)가 나오면 className이 그대로라 브라우저가 변화를 감지 못해
+// 슬램 애니메이션이 재생되지 않는다. 클래스를 한번 비웠다가(+강제 리플로우) 다시
+// 붙여서 매번 애니메이션이 새로 시작되도록 한다.
+function playStamp(kind, text){
+  const stamp = document.getElementById("result-stamp");
+  stamp.classList.remove("correct", "wrong");
+  void stamp.offsetWidth; // 강제 리플로우로 애니메이션 재시작
+  stamp.textContent = text;
+  stamp.classList.add(kind);
+}
+
 async function renderReveal(){
   const q = session.questions[session.current_index];
-  const stamp = document.getElementById("result-stamp");
   const streakWrap = document.getElementById("streak-badge-wrap");
   streakWrap.innerHTML = "";
   if(answeredIndex === session.current_index){
     await checkMyAnswer();
   } else {
     streak = 0;
-    stamp.textContent = "－";
-    stamp.className = "result-stamp wrong";
+    playStamp("wrong", "－");
   }
   document.getElementById("result-answer-text").textContent = `정답: ${q.answer}` + (q.explain ? ` (${q.explain})` : "");
   if(streak >= 2){
@@ -408,15 +420,14 @@ async function renderReveal(){
 async function checkMyAnswer(){
   const answerId = `${player.id}_${session.current_index}`;
   const snap = await getDoc(doc(db, "quiz_sessions", session.id, "answers", answerId));
-  const stamp = document.getElementById("result-stamp");
   if(snap.exists() && snap.data().is_correct){
-    stamp.textContent = "O";
-    stamp.className = "result-stamp correct";
+    playStamp("correct", "O");
     streak++;
-    fireConfetti(35);
+    // 컨페티는 매번 터뜨리면 금방 질리므로 연속 정답(스트릭)일 때만, 스트릭이
+    // 쌓일수록 더 크게 터지도록 강약을 준다.
+    if(streak >= 2) fireConfetti(Math.min(35 + streak*10, 90));
   } else {
-    stamp.textContent = "X";
-    stamp.className = "result-stamp wrong";
+    playStamp("wrong", "X");
     streak = 0;
   }
 }
