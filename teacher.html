@@ -95,7 +95,6 @@ textarea#questions-json{
 .toggle-option.selected{ border-color:var(--red); background:#FBEDE9; }
 .toggle-option strong{ display:block; margin-bottom:4px; }
 .toggle-option span{ font-size:13px; color:var(--ink-soft); }
-#time-limit-field{ display:none; }
 input[type=number]{ font-size:16px; padding:8px 12px; border:2px solid var(--grid); border-radius:6px; width:100px;}
 #setup-error{ color:var(--red); font-weight:700; min-height:20px; margin-top:10px;}
 
@@ -115,6 +114,13 @@ input[type=number]{ font-size:16px; padding:8px 12px; border:2px solid var(--gri
   background:#fff; border:2px solid var(--ink); border-radius:20px; padding:8px 18px; font-weight:700;
 }
 #player-count{ font-family:'Noto Serif KR', serif; font-size:20px; margin-bottom:8px; }
+
+/* ---------- 실시간 답변 현황 (문제 화면) ---------- */
+.answer-progress{ margin-top:18px; text-align:center; }
+.answer-progress .progress-label{ font-weight:700; color:var(--ink-soft); margin-bottom:8px; }
+.answer-progress .chip-row{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; max-width:800px; margin:0 auto; }
+.progress-chip{ border-radius:16px; padding:6px 14px; font-size:13px; font-weight:700; border:2px solid var(--grid); background:#fff; color:var(--ink-soft); }
+.progress-chip.done{ border-color:var(--green-stamp); background:#EEF3EC; color:var(--green-stamp); }
 
 /* ---------- 문제 화면 (원고지) ---------- */
 #question-screen{ width:100%; max-width:1000px; }
@@ -151,7 +157,8 @@ input[type=number]{ font-size:16px; padding:8px 12px; border:2px solid var(--gri
 .control-bar{ display:flex; gap:14px; margin-top:30px; }
 
 /* ---------- 정답 공개 / 리더보드 ---------- */
-.leaderboard{ width:100%; max-width:600px; }
+.leaderboard{ width:100%; max-width:600px; margin:0 auto; }
+.leaderboard h3{ font-family:'Noto Serif KR', serif; font-size:18px; margin-bottom:10px; text-align:center; }
 .lb-row{
   display:flex; justify-content:space-between; align-items:center; background:#fff;
   border:2px solid var(--ink); border-radius:10px; padding:14px 20px; margin-bottom:10px; font-weight:700;
@@ -210,8 +217,9 @@ h2.explain{ font-family:'Noto Serif KR', serif; font-weight:500; font-size:20px;
     </div>
 
     <div class="field" id="time-limit-field">
-      <label>문항당 제한 시간(초)</label>
+      <label>문항당 기준 시간(초)</label>
       <input type="number" id="time-limit-input" value="20" min="5" max="120">
+      <div class="field-hint">자동 진행에서는 실제 제한 시간, 수동 진행에서도 "빠르게 맞힐수록 고득점" 점수 계산의 기준 시간으로 쓰입니다.</div>
     </div>
 
     <div class="field">
@@ -253,10 +261,12 @@ h2.explain{ font-family:'Noto Serif KR', serif; font-weight:500; font-size:20px;
   </div>
   <div class="manuscript" id="manuscript-prompt"></div>
   <div class="options-grid" id="options-grid"></div>
+  <div class="answer-progress" id="answer-progress"></div>
   <div class="control-bar">
     <button class="btn ghost" id="reveal-btn" onclick="revealAnswer()">정답 공개</button>
     <button class="btn" id="next-btn" onclick="nextQuestion()" disabled>다음 문제</button>
   </div>
+  <div class="leaderboard" id="live-leaderboard" style="display:none;"></div>
 </div>
 
 <!-- ============ 종료 화면 ============ -->
@@ -345,7 +355,6 @@ function selectMode(m){
 function selectAdvance(a){
   selectedAdvance = a;
   document.querySelectorAll("[data-advance]").forEach(el=>el.classList.toggle("selected", el.dataset.advance===a));
-  document.getElementById("time-limit-field").style.display = (a==="auto") ? "block" : "none";
 }
 
 function genRoomCode(){
@@ -438,7 +447,7 @@ async function startGame(){
 
 async function advanceTo(index){
   try{
-    await updateDoc(doc(db, "quiz_sessions", session.id), { current_index:index, status:"active" });
+    await updateDoc(doc(db, "quiz_sessions", session.id), { current_index:index, status:"active", question_started_at: serverTimestamp() });
   }catch(e){
     alert("진행 오류: "+e.message);
     return;
@@ -455,6 +464,9 @@ function renderQuestion(){
   document.getElementById("reveal-btn").disabled = false;
   document.getElementById("reveal-btn").textContent = "정답 공개";
   document.getElementById("next-btn").disabled = true;
+  document.getElementById("live-leaderboard").style.display = "none";
+  document.getElementById("live-leaderboard").innerHTML = "";
+  renderAnswerProgress();
 
   // 원고지 렌더링
   const chars = q.prompt.split("");
@@ -525,8 +537,32 @@ function updateAnswerCounts(){
     if(countEl) countEl.textContent = `${c}표`;
     if(barEl) barEl.style.width = pct+"%";
   });
+  renderAnswerProgress();
 }
 function cssEscape(v){ return v.replace(/"/g,'\\"'); }
+
+// 카훗처럼: 전체 참여자 닉네임 + 실시간 답변 완료 현황
+function renderAnswerProgress(){
+  const wrap = document.getElementById("answer-progress");
+  if(session.mode !== "individual" || players.length===0){ wrap.innerHTML = ""; return; }
+  const relevant = currentAnswers.filter(a=>a.question_index===session.current_index);
+  const answeredIds = new Set(relevant.map(a=>a.player_id));
+  const doneCount = players.filter(p=>answeredIds.has(p.id)).length;
+  wrap.innerHTML = `
+    <div class="progress-label">답변 완료: ${doneCount} / ${players.length}명</div>
+    <div class="chip-row">${players.map(p=>`<span class="progress-chip ${answeredIds.has(p.id)?'done':''}">${escapeHtml(p.nickname)}</span>`).join("")}</div>
+  `;
+}
+
+// 다음 문제로 넘어가기 전 현재 스코어보드
+function renderLiveLeaderboard(){
+  const el = document.getElementById("live-leaderboard");
+  if(session.mode !== "individual" || players.length===0){ el.style.display = "none"; return; }
+  el.innerHTML = `<h3>현재 스코어</h3>` + players.slice(0,8).map((p,i)=>`
+    <div class="lb-row"><span><span class="rank">${i+1}</span>${escapeHtml(p.nickname)}</span><span>${p.score}점</span></div>
+  `).join("");
+  el.style.display = "block";
+}
 
 async function revealAnswer(){
   clearInterval(timerInterval);
@@ -551,6 +587,7 @@ async function revealAnswer(){
     const q2 = query(collection(db, "quiz_sessions", session.id, "players"), orderBy("score","desc"));
     const snap = await getDocs(q2);
     players = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+    renderLiveLeaderboard();
   }
 }
 

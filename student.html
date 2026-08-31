@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>맞춤법 퀴즈 참여</title>
 </head>
 <body>
@@ -75,9 +75,11 @@ input{
 <!-- ============ 참여 화면 ============ -->
 <div id="join-screen" class="screen active">
   <h1>맞춤법 퀴즈</h1>
-  <input id="room-input" type="text" placeholder="방 코드 6자리" maxlength="6" style="text-transform:uppercase;">
-  <input id="nickname-input" type="text" placeholder="닉네임" maxlength="10">
-  <button class="btn" onclick="joinSession()">참여하기</button>
+  <form id="join-form">
+    <input id="room-input" type="text" inputmode="text" placeholder="방 코드 6자리" maxlength="6" autocomplete="off" autocapitalize="characters" enterkeyhint="next" style="text-transform:uppercase;">
+    <input id="nickname-input" type="text" placeholder="닉네임" maxlength="10" autocomplete="off" enterkeyhint="go">
+    <button class="btn" type="submit">참여하기</button>
+  </form>
   <div id="join-error"></div>
 </div>
 
@@ -129,19 +131,31 @@ function showScreen(id){
   document.getElementById(id).classList.add("active");
 }
 
+// 폼 제출(모바일 키보드의 "이동/완료" 포함)로 참여하기 연결
+document.getElementById("join-form").addEventListener("submit", e=>{
+  e.preventDefault();
+  joinSession();
+});
+
 // URL의 ?room= 값 자동 채우기
-const params = new URLSearchParams(location.search);
-if(params.get("room")){
-  document.getElementById("room-input").value = params.get("room").toUpperCase();
-}
+try{
+  const params = new URLSearchParams(location.search);
+  if(params.get("room")){
+    document.getElementById("room-input").value = params.get("room").toUpperCase();
+  }
+}catch(e){}
+
 // 새로고침 시 재접속 지원
-const saved = sessionStorage.getItem("quiz_player");
-if(saved){
-  try{
+// 일부 모바일 인앱 브라우저·프라이버시 모드에서는 sessionStorage 접근 자체가
+// 예외를 던져서(SecurityError 등) 이 아래의 모든 스크립트 실행이 멈추고
+// 버튼이 먹통이 될 수 있으므로 반드시 try/catch로 감싼다.
+try{
+  const saved = sessionStorage.getItem("quiz_player");
+  if(saved){
     const s = JSON.parse(saved);
     rejoin(s.sessionId, s.playerId);
-  }catch(e){}
-}
+  }
+}catch(e){}
 
 async function joinSession(){
   const errEl = document.getElementById("join-error");
@@ -178,7 +192,7 @@ async function joinSession(){
 
   session = { id: sessDoc.id, ...sessData };
   player = { id: playerRef.id, nickname, score: 0 };
-  sessionStorage.setItem("quiz_player", JSON.stringify({sessionId:session.id, playerId:player.id}));
+  try{ sessionStorage.setItem("quiz_player", JSON.stringify({sessionId:session.id, playerId:player.id})); }catch(e){}
   startListening();
   renderForStatus();
 }
@@ -242,25 +256,42 @@ function renderQuestion(){
   }
 }
 
+// 빨리 맞힐수록 고득점: 문제 시작 시각(question_started_at) 대비 경과 시간에 따라
+// 정답 점수를 MAX_POINTS(즉시 정답)~MIN_POINTS(기준 시간 다 써서 정답) 사이로 선형 감점.
+// 오답은 0점. 서버 계산이 아니라 클라이언트 계산이라 완벽한 부정행위 방지는 아니며,
+// firestore.rules에 이미 명시된 "가벼운 보호 수준" 설계와 일관됩니다.
+const MAX_POINTS = 1000, MIN_POINTS = 500;
+
+function calcPoints(isCorrect){
+  if(!isCorrect) return 0;
+  const limit = session.time_limit || 20;
+  const startedAtMs = (session.question_started_at && typeof session.question_started_at.toMillis === "function")
+    ? session.question_started_at.toMillis() : Date.now();
+  const elapsedSec = Math.max(0, (Date.now() - startedAtMs) / 1000);
+  const ratio = Math.min(1, elapsedSec / limit);
+  return Math.round(MAX_POINTS - (MAX_POINTS - MIN_POINTS) * ratio);
+}
+
 async function submitAnswer(val){
   document.querySelectorAll(".answer-btn").forEach(b=>{ b.disabled = true; if(b.textContent===val) b.classList.add("picked"); });
   const q = session.questions[session.current_index];
   const isCorrect = (val === q.answer);
+  const points = calcPoints(isCorrect);
 
   // 문서 ID를 "플레이어ID_문항번호"로 고정 → 같은 문항에 중복 제출 방지
   const answerId = `${player.id}_${session.current_index}`;
   try{
     await setDoc(doc(db, "quiz_sessions", session.id, "answers", answerId), {
       player_id: player.id, question_index: session.current_index,
-      answer: val, is_correct: isCorrect, answered_at: serverTimestamp()
+      answer: val, is_correct: isCorrect, points_earned: points, answered_at: serverTimestamp()
     });
   }catch(e){
     document.getElementById("answer-status").textContent = "제출 실패: 오류가 발생했습니다.";
     return;
   }
   answeredIndex = session.current_index;
-  if(isCorrect){
-    await updateDoc(doc(db, "quiz_sessions", session.id, "players", player.id), { score: increment(1) });
+  if(points > 0){
+    await updateDoc(doc(db, "quiz_sessions", session.id, "players", player.id), { score: increment(points) });
   }
   document.getElementById("waiting-title").textContent = "제출 완료! 다음을 기다리는 중...";
   showScreen("waiting-screen");
@@ -283,16 +314,20 @@ async function checkMyAnswer(){
   const answerId = `${player.id}_${session.current_index}`;
   const snap = await getDoc(doc(db, "quiz_sessions", session.id, "answers", answerId));
   const stamp = document.getElementById("result-stamp");
+  let earned = 0;
   if(snap.exists() && snap.data().is_correct){
     stamp.textContent = "O";
     stamp.className = "result-stamp correct";
+    earned = snap.data().points_earned || 0;
   } else {
     stamp.textContent = "X";
     stamp.className = "result-stamp wrong";
   }
   const meSnap = await getDoc(doc(db, "quiz_sessions", session.id, "players", player.id));
   const myScore = meSnap.exists() ? (meSnap.data().score || 0) : 0;
-  document.getElementById("score-line").textContent = `현재 점수: ${myScore}점`;
+  document.getElementById("score-line").textContent = earned > 0
+    ? `이번 문제 +${earned}점 (빠른 정답 보너스) · 현재 점수: ${myScore}점`
+    : `현재 점수: ${myScore}점`;
 }
 
 async function renderFinal(){
@@ -306,14 +341,13 @@ async function renderFinal(){
   const rank = all.findIndex(p=>p.id===player.id) + 1;
   document.getElementById("final-rank-line").textContent = `전체 ${all.length}명 중 ${rank}등`;
 
-  sessionStorage.removeItem("quiz_player");
+  try{ sessionStorage.removeItem("quiz_player"); }catch(e){}
 }
 
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
 
-window.joinSession = joinSession;
 window.submitAnswer = submitAnswer;
 </script>
 </body>
