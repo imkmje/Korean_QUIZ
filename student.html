@@ -84,6 +84,8 @@ input{
   color:#fff; cursor:pointer; box-shadow:4px 4px 0 var(--shadow-c); transition:transform .1s ease, box-shadow .1s ease;
 }
 .answer-btn .opt-icon{ display:block; font-size:20px; margin-bottom:4px; opacity:.9; }
+/* OX 버튼은 도형 아이콘 자체가 이미 O/X를 나타내므로 글자 없이 아이콘만 크게 보여준다. */
+.answer-btn.ox-icon .opt-icon{ font-size:44px; margin-bottom:0; }
 .answer-btn.opt-red{ background:var(--opt-red); }
 .answer-btn.opt-blue{ background:var(--opt-blue); }
 .answer-btn.opt-gold{ background:var(--opt-gold); color:var(--ink); }
@@ -110,6 +112,11 @@ input{
   padding:8px 18px; border-radius:20px; border:3px solid var(--ink); margin-bottom:14px; box-shadow:3px 3px 0 var(--shadow-c);
   animation:popIn .4s cubic-bezier(.34,1.56,.64,1) both;
 }
+/* 대기 화면에서 "내가 이 닉네임으로 들어와 있다"를 스스로 확인할 수 있도록 표시 */
+.my-nickname-badge{
+  display:inline-flex; align-items:center; gap:6px; background:#fff; font-weight:900;
+  padding:6px 16px; border-radius:20px; border:3px solid var(--ink); margin-bottom:18px; box-shadow:3px 3px 0 var(--shadow-c);
+}
 .score-line{ font-family:'Noto Serif KR',serif; font-weight:900; font-size:20px; margin-top:6px; }
 .score-line .num{ display:inline-block; animation:pop .35s ease; color:var(--red-deep); }
 .rank-line{ color:var(--ink-soft); margin-top:6px; }
@@ -135,6 +142,7 @@ input{
 
 <!-- ============ 대기 화면 ============ -->
 <div id="waiting-screen" class="screen">
+  <div class="my-nickname-badge" id="my-nickname-badge"></div>
   <h1 id="waiting-title">선생님이 시작하기를 기다리는 중...</h1>
   <p style="color:var(--ink-soft);">화면을 앞에 있는 교실 화면과 함께 봐주세요.</p>
   <div class="waiting-dots"><span></span><span></span><span></span></div>
@@ -360,6 +368,10 @@ async function rejoin(sessionId, playerId){
 }
 
 function startListening(){
+  // 대기 화면에서 "내가 이 닉네임으로 들어와 있다"를 스스로 확인할 수 있게 표시.
+  // 세션 중 닉네임이 바뀌지 않으므로 한 번만 설정하면 된다.
+  document.getElementById("my-nickname-badge").textContent = `🙋 ${player.nickname}`;
+
   unsubSession = onSnapshot(doc(db, "quiz_sessions", session.id), snap=>{
     if(!snap.exists()) return;
     session = { id: snap.id, ...snap.data() };
@@ -413,7 +425,7 @@ function renderQuestion(){
   if(q.type === "ox"){
     grid.className = "answer-grid ox";
     const oxShape = { "O": {cls:"opt-green", icon:"●"}, "X": {cls:"opt-red", icon:"✕"} };
-    grid.innerHTML = ["O","X"].map(v=>`<button class="answer-btn ${oxShape[v].cls}" data-value="${v}"><span class="opt-icon">${oxShape[v].icon}</span>${v}</button>`).join("");
+    grid.innerHTML = ["O","X"].map(v=>`<button class="answer-btn ox-icon ${oxShape[v].cls}" data-value="${v}"><span class="opt-icon">${oxShape[v].icon}</span></button>`).join("");
   } else {
     grid.className = "answer-grid";
     grid.innerHTML = q.options.map((v,i)=>`<button class="answer-btn ${OPT_SHAPES[i%4].cls}" data-value="${escapeHtml(v)}"><span class="opt-icon">${OPT_SHAPES[i%4].icon}</span>${escapeHtml(v)}</button>`).join("");

@@ -194,6 +194,8 @@ input[type=number]{ font-size:16px; padding:8px 12px; border:2px solid var(--gri
   box-shadow:5px 5px 0 var(--shadow-c); transition:transform .15s ease;
 }
 .option-box .opt-icon{ font-size:15px; margin-right:8px; opacity:.85; vertical-align:2px; }
+/* OX 옵션은 도형 아이콘 자체가 이미 O/X를 나타내므로 글자 없이 아이콘만 크게 보여준다. */
+.option-box.ox-icon .opt-icon{ display:block; font-size:44px; margin:0; }
 .option-box.opt-red{ background:var(--opt-red); }
 .option-box.opt-blue{ background:var(--opt-blue); }
 .option-box.opt-gold{ background:var(--opt-gold); color:var(--ink); }
@@ -759,8 +761,8 @@ function renderQuestion(){
     optWrap.className = "options-grid ox";
     const oxShape = { "O": {cls:"opt-green", icon:"●"}, "X": {cls:"opt-red", icon:"✕"} };
     optWrap.innerHTML = ["O","X"].map(v=>`
-      <div class="option-box ${oxShape[v].cls}" data-val="${v}">
-        <div><span class="opt-icon">${oxShape[v].icon}</span>${v}</div>
+      <div class="option-box ox-icon ${oxShape[v].cls}" data-val="${v}">
+        <div><span class="opt-icon">${oxShape[v].icon}</span></div>
       </div>`).join("");
   } else {
     optWrap.className = "options-grid";
