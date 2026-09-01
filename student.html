@@ -75,6 +75,8 @@ input{
   border:3px solid var(--ink); border-radius:14px; padding:20px; background:#fff; max-width:480px;
   box-shadow:4px 4px 0 var(--shadow-c);
 }
+/* 문항의 target(맞춤법 판단 대상 단어)을 파란색 굵은 글씨로 강조해 무엇을 묻는지 바로 보이게 한다. */
+.q-prompt .target-word{ color:var(--blue); font-weight:900; }
 .timer-mini{ font-weight:900; color:#fff; background:var(--red); font-size:16px; margin-bottom:14px; padding:6px 16px; border-radius:16px; border:2px solid var(--ink); }
 .timer-mini.urgent{ background:var(--red-deep); animation:shakeUrgent .5s ease-in-out infinite; }
 .answer-grid{ display:grid; gap:14px; width:100%; max-width:380px; margin:0 auto; }
@@ -417,9 +419,21 @@ const OPT_SHAPES = [
   {cls:"opt-green", icon:"■"}
 ];
 
+// 아이들이 문장 전체에서 정확히 무엇을 판단해야 하는지 모를 수 있어, 맞춤법 판단
+// 대상 단어(q.target)가 지정돼 있으면 해당 부분만 파란 굵은 글씨로 강조한다.
+// target 필드가 없는 문항(예: 기존에 만들어둔 커스텀 문제)은 그냥 강조 없이 표시된다.
+function renderPromptHtml(prompt, target){
+  const idx = target ? prompt.indexOf(target) : -1;
+  if(idx < 0) return escapeHtml(prompt);
+  const before = prompt.slice(0, idx);
+  const mid = prompt.slice(idx, idx + target.length);
+  const after = prompt.slice(idx + target.length);
+  return escapeHtml(before) + `<span class="target-word">${escapeHtml(mid)}</span>` + escapeHtml(after);
+}
+
 function renderQuestion(){
   const q = questions[session.current_index];
-  document.getElementById("q-prompt-student").textContent = q.prompt;
+  document.getElementById("q-prompt-student").innerHTML = renderPromptHtml(q.prompt, q.target);
   document.getElementById("answer-status").textContent = "";
   const grid = document.getElementById("answer-grid");
   if(q.type === "ox"){

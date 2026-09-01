@@ -185,6 +185,8 @@ input[type=number]{ font-size:16px; padding:8px 12px; border:2px solid var(--gri
 }
 .manuscript span.punct{ border-color:transparent; width:20px; }
 .manuscript span.blank{ border:none; border-bottom:3px solid var(--ink); border-radius:0; background:transparent; }
+/* 문항의 target(맞춤법 판단 대상 단어)을 파란색으로 강조해 무엇을 묻는지 바로 보이게 한다. */
+.manuscript span.target-word{ border-color:var(--blue); background:#EAF2FE; color:var(--blue-deep); font-weight:900; }
 
 .options-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; width:100%; }
 .options-grid.ox{ grid-template-columns:1fr 1fr; max-width:520px; margin:0 auto; }
@@ -415,20 +417,20 @@ function loadSessionRef(){
 }
 
 const DEFAULT_QUESTIONS = [
-  {type:"ox", prompt:"매사에 말과 행동을 삼가해야 한다.", answer:"X", explain:"삼가야 한다 — '삼가하다'는 없는 말입니다."},
-  {type:"ox", prompt:"그는 회의 안건을 결제했다.", answer:"X", explain:"승인의 의미이므로 '결재'가 맞습니다."},
-  {type:"ox", prompt:"감기가 다 낳았다.", answer:"X", explain:"병이 나은 것이므로 '나았다'가 맞습니다."},
-  {type:"ox", prompt:"그는 친구로서 나를 도와줬다.", answer:"O", explain:"자격을 뜻하는 '로서'가 맞습니다."},
-  {type:"ox", prompt:"실력으로서 승부를 봐야 한다.", answer:"X", explain:"수단을 뜻하므로 '실력으로써'가 맞습니다."},
-  {type:"ox", prompt:"고무줄을 늘여서 팔찌를 만들었다.", answer:"O", explain:"길이를 늘일 때는 '늘이다'가 맞습니다."},
-  {type:"ox", prompt:"넉넉치 않은 형편이었다.", answer:"X", explain:"'넉넉지'가 올바른 표기입니다."},
-  {type:"ox", prompt:"내일 시간 되요?", answer:"X", explain:"'되어요?'가 자연스러우므로 '돼요?'가 맞습니다."},
-  {type:"ox", prompt:"이건 제 것이 아니예요.", answer:"X", explain:"'아니다'는 무조건 '아니에요'로 씁니다."},
-  {type:"ox", prompt:"저녁 먹고 설겆이를 했다.", answer:"X", explain:"'설거지'가 표준어입니다."},
-  {type:"ox", prompt:"친구야, 이따 전화할께.", answer:"X", explain:"'할게'가 표준 표기입니다."},
-  {type:"ox", prompt:"웃어른을 공경해야 한다.", answer:"O", explain:"위아래 구분이 불명확한 말이라 '웃-'을 씁니다."},
-  {type:"ox", prompt:"오랫만에 만난 친구가 반가웠다.", answer:"X", explain:"'오랜만에'가 맞습니다."},
-  {type:"ox", prompt:"아침에 햇님이 방긋 웃었다.", answer:"X", explain:"'님'은 접사이므로 사이시옷 없이 '해님'으로 씁니다."},
+  {type:"ox", prompt:"매사에 말과 행동을 삼가해야 한다.", target:"삼가해야", answer:"X", explain:"삼가야 한다 — '삼가하다'는 없는 말입니다."},
+  {type:"ox", prompt:"그는 회의 안건을 결제했다.", target:"결제했다", answer:"X", explain:"승인의 의미이므로 '결재'가 맞습니다."},
+  {type:"ox", prompt:"감기가 다 낳았다.", target:"낳았다", answer:"X", explain:"병이 나은 것이므로 '나았다'가 맞습니다."},
+  {type:"ox", prompt:"그는 친구로서 나를 도와줬다.", target:"로서", answer:"O", explain:"자격을 뜻하는 '로서'가 맞습니다."},
+  {type:"ox", prompt:"실력으로서 승부를 봐야 한다.", target:"로서", answer:"X", explain:"수단을 뜻하므로 '실력으로써'가 맞습니다."},
+  {type:"ox", prompt:"고무줄을 늘여서 팔찌를 만들었다.", target:"늘여서", answer:"O", explain:"길이를 늘일 때는 '늘이다'가 맞습니다."},
+  {type:"ox", prompt:"넉넉치 않은 형편이었다.", target:"넉넉치", answer:"X", explain:"'넉넉지'가 올바른 표기입니다."},
+  {type:"ox", prompt:"내일 시간 되요?", target:"되요", answer:"X", explain:"'되어요?'가 자연스러우므로 '돼요?'가 맞습니다."},
+  {type:"ox", prompt:"이건 제 것이 아니예요.", target:"아니예요", answer:"X", explain:"'아니다'는 무조건 '아니에요'로 씁니다."},
+  {type:"ox", prompt:"저녁 먹고 설겆이를 했다.", target:"설겆이", answer:"X", explain:"'설거지'가 표준어입니다."},
+  {type:"ox", prompt:"친구야, 이따 전화할께.", target:"할께", answer:"X", explain:"'할게'가 표준 표기입니다."},
+  {type:"ox", prompt:"웃어른을 공경해야 한다.", target:"웃어른", answer:"O", explain:"위아래 구분이 불명확한 말이라 '웃-'을 씁니다."},
+  {type:"ox", prompt:"오랫만에 만난 친구가 반가웠다.", target:"오랫만에", answer:"X", explain:"'오랜만에'가 맞습니다."},
+  {type:"ox", prompt:"아침에 햇님이 방긋 웃었다.", target:"햇님", answer:"X", explain:"'님'은 접사이므로 사이시옷 없이 '해님'으로 씁니다."},
   {type:"mc", prompt:"다음 중 명사형으로 올바른 표기는?", options:["설레임","설렘"], answer:"설렘", explain:"'설렘'이 표준어입니다."},
   {type:"mc", prompt:"다음 중 올바른 표기는?", options:["왠일이니","웬일이니"], answer:"웬일이니", explain:"'웬일'이 표준 표기입니다."},
   {type:"mc", prompt:"우표를 붙여 편지를 보내는 것은?", options:["편지를 붙이다","편지를 부치다"], answer:"편지를 부치다", explain:"우편으로 보낼 때는 '부치다'."},
@@ -744,13 +746,23 @@ function renderQuestion(){
 
   // 원고지 렌더링 — 밑줄(_)이 연속되면 빈칸 채우기용 넓은 밑줄 칸 하나로 합쳐서 표시
   const tokens = q.prompt.match(/_+|[^_]/g) || [];
+  // 아이들이 문장 전체에서 정확히 무엇을 판단해야 하는지 모를 수 있어, 맞춤법 판단
+  // 대상 단어(q.target)가 지정돼 있으면 해당 글자들만 파란색으로 강조한다.
+  // target 필드가 없는 문항(예: 기존에 만들어둔 커스텀 문제)은 그냥 강조 없이 표시된다.
+  const targetStart = q.target ? q.prompt.indexOf(q.target) : -1;
+  const targetEnd = targetStart >= 0 ? targetStart + q.target.length : -1;
+  let pos = 0;
   document.getElementById("manuscript-prompt").innerHTML = tokens.map(t=>{
+    const start = pos;
+    pos += t.length;
+    const isTarget = targetStart >= 0 && start < targetEnd && pos > targetStart;
     if(/^_+$/.test(t)){
       const w = Math.max(52, t.length * 22);
       return `<span class="blank" style="width:${w}px"></span>`;
     }
     const isPunct = /[.,!?~"']/.test(t) || t===" ";
-    return `<span class="${isPunct?'punct':''}">${t===" "?"":escapeHtml(t)}</span>`;
+    const cls = [isPunct ? "punct" : "", isTarget ? "target-word" : ""].filter(Boolean).join(" ");
+    return `<span class="${cls}">${t===" "?"":escapeHtml(t)}</span>`;
   }).join("");
 
   // 옵션 렌더링 (카훗 스타일 색상 + 도형 아이콘)
