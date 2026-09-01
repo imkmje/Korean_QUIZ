@@ -205,6 +205,16 @@ input[type=number]{ font-size:16px; padding:8px 12px; border:2px solid var(--gri
 .option-box.correct{ animation:stampSlam .55s cubic-bezier(.34,1.56,.64,1) both; outline:5px solid var(--gold); outline-offset:3px; }
 .option-box.correct::after{ content:"✓ 정답"; position:absolute; top:-16px; right:10px; background:var(--gold); color:var(--ink); font-size:12px; font-weight:900; padding:4px 12px; border-radius:12px; border:2px solid var(--ink); }
 .option-box.dim{ opacity:.35; }
+/* 정답 공개 시에만 카드가 클릭 가능해진다 — 문제 풀이 중엔 클릭해도 아무 반응 없음(오해 방지). */
+.option-box.clickable{ cursor:pointer; transition:transform .15s ease, box-shadow .15s ease; }
+.option-box.clickable:hover{ transform:translate(-2px,-2px); box-shadow:7px 7px 0 var(--shadow-c); }
+.option-box.clickable:active{ transform:translate(1px,1px); box-shadow:3px 3px 0 var(--shadow-c); }
+.vote-count{
+  margin-top:8px; font-size:14px; font-weight:900; background:rgba(0,0,0,.18); color:#fff;
+  border-radius:12px; padding:3px 10px; display:inline-block;
+}
+.option-box.opt-gold .vote-count{ background:rgba(0,0,0,.12); color:var(--ink); }
+.vote-hint{ text-align:center; color:var(--ink-soft); font-size:14px; margin-top:12px; animation:popIn .4s cubic-bezier(.34,1.56,.64,1) both; }
 
 .control-bar{ display:flex; gap:14px; margin-top:26px; }
 
@@ -377,7 +387,7 @@ h2.explain{ font-family:'Noto Serif KR', serif; font-weight:700; font-size:20px;
     <button class="btn ghost" id="reveal-btn" onclick="revealAnswer()">정답 공개</button>
     <button class="btn gold" id="next-btn" onclick="nextQuestion()" disabled>다음 문제 →</button>
   </div>
-  <button class="btn ghost" id="toggle-breakdown-btn" onclick="toggleAnswerBreakdown()" style="display:none; margin-top:10px;">🔍 학생 답안 보기</button>
+  <div class="vote-hint" id="vote-hint" style="display:none;">👆 카드를 눌러 누가 이 답을 골랐는지 보기</div>
   <div class="answer-breakdown" id="answer-breakdown" style="display:none;"></div>
   <div class="leaderboard" id="live-leaderboard" style="display:none;"></div>
 </div>
@@ -760,10 +770,9 @@ function renderQuestion(){
   document.getElementById("next-btn").disabled = true;
   document.getElementById("live-leaderboard").style.display = "none";
   document.getElementById("live-leaderboard").innerHTML = "";
-  // "학생 답안 보기"는 정답 공개 후에만 뜨는 버튼이라, 새 문제로 넘어갈 때마다
-  // 버튼과 펼침 패널을 완전히 초기 상태(숨김·접힘)로 되돌린다.
-  document.getElementById("toggle-breakdown-btn").style.display = "none";
-  document.getElementById("toggle-breakdown-btn").textContent = "🔍 학생 답안 보기";
+  // 득표 카드 클릭·힌트·펼침 패널은 정답 공개 후에만 나타나므로, 새 문제로
+  // 넘어갈 때마다 완전히 초기 상태(숨김·접힘·클릭 불가)로 되돌린다.
+  document.getElementById("vote-hint").style.display = "none";
   document.getElementById("answer-breakdown").style.display = "none";
   document.getElementById("answer-breakdown").innerHTML = "";
   renderAnswerProgress();
@@ -792,19 +801,21 @@ function renderQuestion(){
   // 옵션 렌더링 (카훗 스타일 색상 + 도형 아이콘)
   const optWrap = document.getElementById("options-grid");
   // 득표 수는 답변 중인 다른 학생에게 영향을 줄 수 있어 화면에 표시하지 않는다.
-  // (정답 공개 시에도 정답 강조만 하고 득표 집계는 보여주지 않음 — updateAnswerCounts 참고)
+  // 정답 공개(revealAnswer) 시점에만 카드마다 득표 수 배지가 붙고 클릭 가능해진다 — renderRevealVisuals 참고.
   if(q.type === "ox"){
     optWrap.className = "options-grid ox";
     const oxShape = { "O": {cls:"opt-green", icon:"●"}, "X": {cls:"opt-red", icon:"✕"} };
     optWrap.innerHTML = ["O","X"].map(v=>`
       <div class="option-box ox-icon ${oxShape[v].cls}" data-val="${v}">
         <div><span class="opt-icon">${oxShape[v].icon}</span></div>
+        <div class="vote-count" style="display:none;"></div>
       </div>`).join("");
   } else {
     optWrap.className = "options-grid";
     optWrap.innerHTML = q.options.map((v,i)=>`
       <div class="option-box ${OPT_SHAPES[i%4].cls}" data-val="${escapeHtml(v)}">
         <div><span class="opt-icon">${OPT_SHAPES[i%4].icon}</span>${escapeHtml(v)}</div>
+        <div class="vote-count" style="display:none;"></div>
       </div>`).join("");
   }
 
@@ -898,14 +909,25 @@ function renderRevealVisuals(q){
     document.getElementById("options-grid").insertAdjacentElement("afterend", note);
   }
 
-  // "학생 답안 보기"는 개인 참여 모드에서만 의미가 있다(다같이 풀이 모드는 참가자
-  // 기록 자체가 없음). 버튼만 노출하고 패널은 접힌 채로 둔다 — 눌러야 펼쳐진다.
+  // 득표 수·카드 클릭은 개인 참여 모드에서만 의미가 있다(다같이 풀이 모드는 참가자
+  // 기록 자체가 없음). "몇 명이 골랐는지"는 정답 공개 즉시 카드에 배지로 보여주고,
+  // "누가 골랐는지"(이름)는 카드를 눌러야만 펼쳐지는 패널에 넣어 단계적으로 공개한다.
   if(session.mode === "individual"){
-    document.getElementById("toggle-breakdown-btn").style.display = "inline-block";
+    const relevant = currentAnswers.filter(a=>a.question_index===session.current_index);
+    const counts = new Map();
+    relevant.forEach(a=>counts.set(a.answer, (counts.get(a.answer)||0) + 1));
+    document.querySelectorAll(".option-box").forEach(el=>{
+      const c = counts.get(el.dataset.val) || 0;
+      const badge = el.querySelector(".vote-count");
+      badge.textContent = `${c}명`;
+      badge.style.display = "inline-block";
+      el.classList.add("clickable");
+    });
+    document.getElementById("vote-hint").style.display = "block";
   }
 }
 
-// 정답 공개 직후엔 바로 보이지 않다가, 교사가 "학생 답안 보기"를 눌렀을 때만
+// 정답 공개 직후엔 이름까지 바로 보이지 않다가, 교사가 카드를 눌렀을 때만
 // 문항별로 누가 어떤 답을 골랐는지 펼쳐서 보여준다(카훗처럼 즉시 노출하지 않음).
 function renderAnswerBreakdown(q){
   const wrap = document.getElementById("answer-breakdown");
@@ -946,17 +968,24 @@ function renderAnswerBreakdown(q){
 
 function toggleAnswerBreakdown(){
   const wrap = document.getElementById("answer-breakdown");
-  const btn = document.getElementById("toggle-breakdown-btn");
+  const hint = document.getElementById("vote-hint");
   const opening = wrap.style.display === "none";
   if(opening){
     renderAnswerBreakdown(questions[session.current_index]);
     wrap.style.display = "block";
-    btn.textContent = "🔽 답안 접기";
+    hint.textContent = "👆 카드를 다시 누르면 접혀요";
   } else {
     wrap.style.display = "none";
-    btn.textContent = "🔍 학생 답안 보기";
+    hint.textContent = "👆 카드를 눌러 누가 이 답을 골랐는지 보기";
   }
 }
+
+// 정답 카드는 정답 공개 후에만 클릭 가능해진다(.clickable 클래스, renderRevealVisuals 참고).
+// 어느 카드를 누르든 같은 펼침 패널이 열려서 문항 전체의 선택 분포를 한눈에 보여준다.
+document.getElementById("options-grid").addEventListener("click", e=>{
+  if(!e.target.closest(".option-box.clickable")) return;
+  toggleAnswerBreakdown();
+});
 
 async function revealAnswer(){
   clearInterval(timerInterval);
@@ -1066,7 +1095,6 @@ window.createSession = createSession;
 window.startGame = startGame;
 window.revealAnswer = revealAnswer;
 window.nextQuestion = nextQuestion;
-window.toggleAnswerBreakdown = toggleAnswerBreakdown;
 </script>
 </body>
 </html>
