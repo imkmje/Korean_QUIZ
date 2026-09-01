@@ -423,6 +423,7 @@ h2.explain{ font-family:'Noto Serif KR', serif; font-weight:700; font-size:20px;
   <h1 style="font-family:'Noto Serif KR',serif; font-weight:900; margin-bottom:16px;">🏆 최종 결과</h1>
   <div class="podium" id="final-podium"></div>
   <div class="leaderboard" id="final-leaderboard"></div>
+  <div id="final-leaderboard-more" style="display:none; margin-top:10px;"></div>
   <button class="btn" onclick="location.reload()" style="margin-top:24px;">새 세션 시작</button>
 </div>
 
@@ -1052,6 +1053,29 @@ async function nextQuestion(){
   }
 }
 
+// 최종 스코어보드 4~10등(또는 "더 보기"로 펼친 11등 이하) 행을 그린다.
+// append=false면 기존 내용을 지우고 새로 채우고, true면 뒤에 이어붙인다.
+function renderFinalLeaderboardRows(players, start, end, append){
+  const maxScore = Math.max(players[0] ? players[0].score : 1, 1);
+  const html = players.slice(start, end).map((p,i)=>{
+    const rank = start + i + 1;
+    return `<div class="lb-row rank-${rank}">
+      <div class="lb-bar" style="width:${Math.round((p.score/maxScore)*100)}%"></div>
+      <span class="lb-left"><span class="rank">${rank}</span><span class="lb-avatar">${avatarFor(p.nickname)}</span>${escapeHtml(p.nickname)}</span>
+      <span class="lb-score">${p.score}점</span>
+    </div>`;
+  }).join("");
+  const el = document.getElementById("final-leaderboard");
+  if(append) el.insertAdjacentHTML("beforeend", html);
+  else el.innerHTML = html || (players.length===0 ? "<p style='text-align:center;'>참여한 학생이 없습니다.</p>" : "");
+}
+
+function expandFinalLeaderboard(){
+  renderFinalLeaderboardRows(players, 10, players.length, true);
+  document.getElementById("final-leaderboard-more").innerHTML = "";
+  document.getElementById("final-leaderboard-more").style.display = "none";
+}
+
 function renderPodium(top3){
   const el = document.getElementById("final-podium");
   if(top3.length===0){ el.innerHTML = ""; return; }
@@ -1079,14 +1103,19 @@ async function endGame(){
     const snap = await getDocs(q2);
     players = snap.docs.map(d=>({ id:d.id, ...d.data() }));
     renderPodium(players.slice(0,3));
-    const maxScore = Math.max(players[0] ? players[0].score : 1, 1);
-    document.getElementById("final-leaderboard").innerHTML = players.slice(3,10).map((p,i)=>`
-      <div class="lb-row rank-${i+4}">
-        <div class="lb-bar" style="width:${Math.round((p.score/maxScore)*100)}%"></div>
-        <span class="lb-left"><span class="rank">${i+4}</span><span class="lb-avatar">${avatarFor(p.nickname)}</span>${escapeHtml(p.nickname)}</span>
-        <span class="lb-score">${p.score}점</span>
-      </div>
-    `).join("") || (players.length===0 ? "<p style='text-align:center;'>참여한 학생이 없습니다.</p>" : "");
+    renderFinalLeaderboardRows(players, 3, 10);
+    // 11등 이하는 처음엔 숨겨두고 "+ N명 더 보기" 버튼을 눌러야만 펼쳐서 보여준다 —
+    // 학급 인원이 많을 때 최종 화면이 너무 길어지는 걸 막으면서도 하위권이 아예
+    // 안 보이는 일은 없게 한다.
+    const moreCount = players.length - 10;
+    const moreWrap = document.getElementById("final-leaderboard-more");
+    if(moreCount > 0){
+      moreWrap.style.display = "block";
+      moreWrap.innerHTML = `<button class="btn ghost" onclick="expandFinalLeaderboard()">+ ${moreCount}명 더 보기</button>`;
+    } else {
+      moreWrap.style.display = "none";
+      moreWrap.innerHTML = "";
+    }
     if(players.length>0) fireConfetti(120);
   } else {
     document.getElementById("final-podium").innerHTML = "";
@@ -1116,6 +1145,7 @@ window.startGame = startGame;
 window.revealAnswer = revealAnswer;
 window.nextQuestion = nextQuestion;
 window.closeAnswerBreakdown = closeAnswerBreakdown;
+window.expandFinalLeaderboard = expandFinalLeaderboard;
 </script>
 </body>
 </html>
