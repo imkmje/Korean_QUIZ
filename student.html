@@ -128,7 +128,7 @@ input{
   <form id="join-form">
     <input id="room-input" type="text" inputmode="text" placeholder="방 코드 6자리" maxlength="6" autocomplete="off" autocapitalize="characters" enterkeyhint="next" style="text-transform:uppercase;">
     <input id="nickname-input" type="text" placeholder="닉네임" maxlength="10" autocomplete="off" enterkeyhint="go">
-    <button class="btn" type="submit">참여하기 🚀</button>
+    <button class="btn" type="submit" id="join-btn">참여하기 🚀</button>
   </form>
   <div id="join-error"></div>
 </div>
@@ -138,6 +138,13 @@ input{
   <h1 id="waiting-title">선생님이 시작하기를 기다리는 중...</h1>
   <p style="color:var(--ink-soft);">화면을 앞에 있는 교실 화면과 함께 봐주세요.</p>
   <div class="waiting-dots"><span></span><span></span><span></span></div>
+</div>
+
+<!-- ============ 강퇴 화면 ============ -->
+<div id="kicked-screen" class="screen">
+  <div class="mascot">🚪</div>
+  <h1>선생님이 내보냈습니다</h1>
+  <p style="color:var(--ink-soft);">참여가 취소되었습니다. 다시 참여하려면 새로고침 후 방 코드를 입력해주세요.</p>
 </div>
 
 <!-- ============ 문제 화면 ============ -->
@@ -182,7 +189,9 @@ let player = null;    // {id, nickname, score}
 let answeredIndex = -1;
 let streak = 0;
 let unsubSession = null;
+let unsubPlayerSelf = null;
 let studentTimerInterval = null;
+let joining = false;  // 참여하기 처리 중 중복 클릭 방지
 
 function showScreen(id){
   document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
@@ -211,8 +220,10 @@ function fireConfetti(count){
 }
 
 // 폼 제출(모바일 키보드의 "이동/완료" 포함)로 참여하기 연결
+// joining 가드로 응답이 오기 전 여러 번 눌러도 중복 참여되지 않게 막는다.
 document.getElementById("join-form").addEventListener("submit", e=>{
   e.preventDefault();
+  if(joining) return;
   joinSession();
 });
 
@@ -249,6 +260,7 @@ try{
 
 async function joinSession(){
   const errEl = document.getElementById("join-error");
+  const btn = document.getElementById("join-btn");
   errEl.textContent = "";
   const roomCode = document.getElementById("room-input").value.trim().toUpperCase();
   const nickname = document.getElementById("nickname-input").value.trim();
@@ -257,57 +269,71 @@ async function joinSession(){
     return;
   }
 
-  const q = query(collection(db, "quiz_sessions"), where("room_code", "==", roomCode));
-  const snap = await getDocs(q);
-  if(snap.empty){
-    errEl.textContent = "해당 방 코드를 찾을 수 없습니다. 다시 확인해주세요.";
-    return;
-  }
-  const sessDoc = snap.docs[0];
-  const sessData = sessDoc.data();
-  if(sessData.status === "finished"){
-    errEl.textContent = "이미 종료된 퀴즈입니다.";
-    return;
-  }
-
-  // 같은 방에 이미 같은 닉네임이 있으면 막는다 (공백·대소문자 무시 비교).
-  // 리더보드에서 이름이 겹쳐 보이는 걸 원천적으로 방지한다.
+  // Firestore 왕복(방 조회 → 닉네임 중복 확인 → 문제 로드 → 참가자 생성)에 걸리는
+  // 시간 동안 버튼을 다시 누르면 같은 학생이 중복 참여되므로, 처리 시작과 동시에
+  // 버튼을 잠그고 "참여 중..."으로 표시한다. 에러로 중단되는 모든 경로에서
+  // finally가 반드시 복구하므로 실패 시 다시 시도할 수 있다.
+  joining = true;
+  btn.disabled = true;
+  btn.textContent = "참여 중...";
   try{
-    const playersSnap = await getDocs(collection(db, "quiz_sessions", sessDoc.id, "players"));
-    const taken = playersSnap.docs.some(d => String(d.data().nickname || "").trim().toLowerCase() === nickname.toLowerCase());
-    if(taken){
-      errEl.textContent = "이미 사용 중인 닉네임입니다. 다른 닉네임을 써주세요.";
+    const q = query(collection(db, "quiz_sessions"), where("room_code", "==", roomCode));
+    const snap = await getDocs(q);
+    if(snap.empty){
+      errEl.textContent = "해당 방 코드를 찾을 수 없습니다. 다시 확인해주세요.";
       return;
     }
-  }catch(e){
-    errEl.textContent = "닉네임 확인에 실패했습니다: " + e.message;
-    return;
-  }
+    const sessDoc = snap.docs[0];
+    const sessData = sessDoc.data();
+    if(sessData.status === "finished"){
+      errEl.textContent = "이미 종료된 퀴즈입니다.";
+      return;
+    }
 
-  // 문제 목록은 세션 문서 본체가 아니라 별도 하위 문서에 있으므로 참여 시 한 번만 받아온다.
-  try{
-    const qSnap = await getDoc(doc(db, "quiz_sessions", sessDoc.id, "meta", "questions"));
-    questions = qSnap.exists() ? (qSnap.data().questions || []) : [];
-  }catch(e){
-    errEl.textContent = "문제 목록을 불러오지 못했습니다: " + e.message;
-    return;
-  }
+    // 같은 방에 이미 같은 닉네임이 있으면 막는다 (공백·대소문자 무시 비교).
+    // 리더보드에서 이름이 겹쳐 보이는 걸 원천적으로 방지한다. 강퇴(kicked:true)된
+    // 참가자의 닉네임은 다시 쓸 수 있어야 하므로 비교에서 제외한다.
+    try{
+      const playersSnap = await getDocs(collection(db, "quiz_sessions", sessDoc.id, "players"));
+      const taken = playersSnap.docs.some(d => !d.data().kicked && String(d.data().nickname || "").trim().toLowerCase() === nickname.toLowerCase());
+      if(taken){
+        errEl.textContent = "이미 사용 중인 닉네임입니다. 다른 닉네임을 써주세요.";
+        return;
+      }
+    }catch(e){
+      errEl.textContent = "닉네임 확인에 실패했습니다: " + e.message;
+      return;
+    }
 
-  let playerRef;
-  try{
-    playerRef = await addDoc(collection(db, "quiz_sessions", sessDoc.id, "players"), {
-      nickname, score: 0, joined_at: serverTimestamp()
-    });
-  }catch(e){
-    errEl.textContent = "참여 실패: " + e.message;
-    return;
-  }
+    // 문제 목록은 세션 문서 본체가 아니라 별도 하위 문서에 있으므로 참여 시 한 번만 받아온다.
+    try{
+      const qSnap = await getDoc(doc(db, "quiz_sessions", sessDoc.id, "meta", "questions"));
+      questions = qSnap.exists() ? (qSnap.data().questions || []) : [];
+    }catch(e){
+      errEl.textContent = "문제 목록을 불러오지 못했습니다: " + e.message;
+      return;
+    }
 
-  session = { id: sessDoc.id, ...sessData };
-  player = { id: playerRef.id, nickname, score: 0 };
-  try{ sessionStorage.setItem("quiz_player", JSON.stringify({sessionId:session.id, playerId:player.id})); }catch(e){}
-  startListening();
-  renderForStatus();
+    let playerRef;
+    try{
+      playerRef = await addDoc(collection(db, "quiz_sessions", sessDoc.id, "players"), {
+        nickname, score: 0, joined_at: serverTimestamp()
+      });
+    }catch(e){
+      errEl.textContent = "참여 실패: " + e.message;
+      return;
+    }
+
+    session = { id: sessDoc.id, ...sessData };
+    player = { id: playerRef.id, nickname, score: 0 };
+    try{ sessionStorage.setItem("quiz_player", JSON.stringify({sessionId:session.id, playerId:player.id})); }catch(e){}
+    startListening();
+    renderForStatus();
+  } finally {
+    joining = false;
+    btn.disabled = false;
+    btn.textContent = "참여하기 🚀";
+  }
 }
 
 async function rejoin(sessionId, playerId){
@@ -338,6 +364,17 @@ function startListening(){
     if(!snap.exists()) return;
     session = { id: snap.id, ...snap.data() };
     renderForStatus();
+  });
+  // 교사가 로비에서 강퇴하면 내 참가자 문서에 kicked:true가 세팅된다.
+  // 실시간으로 감지해서 즉시 안내 화면으로 전환하고 모든 구독/타이머를 정리한다.
+  unsubPlayerSelf = onSnapshot(doc(db, "quiz_sessions", session.id, "players", player.id), snap=>{
+    if(snap.exists() && snap.data().kicked){
+      clearInterval(studentTimerInterval);
+      if(unsubSession){ unsubSession(); unsubSession = null; }
+      if(unsubPlayerSelf){ unsubPlayerSelf(); unsubPlayerSelf = null; }
+      try{ sessionStorage.removeItem("quiz_player"); }catch(e){}
+      showScreen("kicked-screen");
+    }
   });
 }
 
@@ -513,7 +550,7 @@ async function renderFinal(){
 
   const q2 = query(collection(db, "quiz_sessions", session.id, "players"), orderBy("score","desc"));
   const allSnap = await getDocs(q2);
-  const all = allSnap.docs.map(d=>({ id:d.id, ...d.data() }));
+  const all = allSnap.docs.map(d=>({ id:d.id, ...d.data() })).filter(p=>!p.kicked);
   const rank = all.findIndex(p=>p.id===player.id) + 1;
   document.getElementById("final-rank-line").textContent = `전체 ${all.length}명 중 ${rank}등`;
 
@@ -528,6 +565,7 @@ async function renderFinal(){
   // 게임이 끝나면 더 이상 실시간으로 바뀔 데이터가 없으므로 구독을 정리한다.
   clearInterval(studentTimerInterval);
   if(unsubSession){ unsubSession(); unsubSession = null; }
+  if(unsubPlayerSelf){ unsubPlayerSelf(); unsubPlayerSelf = null; }
 }
 
 function escapeHtml(s){
